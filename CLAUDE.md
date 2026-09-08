@@ -35,6 +35,14 @@ unless two utilities genuinely need the same code.
 - Each utility has a short `README.md` describing what it shows, how it
   computes it, and any user-facing options.
 
+## Sharing files with the assistant
+
+`_tmp` is a local, gitignored inbox symlink to a folder the user shares across
+projects. Screenshots, logs, and other files the user wants looked at are
+dropped there; read them from `_tmp/<file>`. Neither the symlink nor its contents belong in git, so treat it as an inbox, not a place for project files.
+When you need to hand a file back (a rendered preview, an export), write it to
+`_tmp/` as well.
+
 ## Verifying a plugin
 
 - Run it directly and strip base64 to read the SwiftBar output:
