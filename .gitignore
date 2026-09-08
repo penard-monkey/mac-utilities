@@ -1,0 +1,8 @@
+# worktrees — per-machine app state (moved between machines by `worktrees sync`, not git)
+/.worktrees.places.json
+/.worktrees/
+
+# planning docs — local working memory
+/task_plan.md
+/findings.md
+/progress.md
