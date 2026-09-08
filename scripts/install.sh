@@ -6,8 +6,9 @@
 #   scripts/install.sh --remove   remove the links this repo created
 #
 # ~/.swiftbar is a plain folder of symlinks; any repo can drop plugins in it.
-# Plugins live here in swiftbar/<utility>/<name>.<interval>.<ext>; the repo is
-# the source of truth, so edits are live on the next refresh.
+# Plugins live here in swiftbar/<utility>/<name>.<interval>.<ext> (menu-bar-only
+# utilities) or <utility>/swiftbar/<name>.<interval>.<ext> (bigger utilities);
+# the repo is the source of truth, so edits are live on the next refresh.
 set -euo pipefail
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
@@ -16,7 +17,7 @@ mkdir -p "$plugin_dir"
 
 mode=${1:-install}
 shopt -s nullglob
-for src in "$repo"/swiftbar/*/*.*.*; do
+for src in "$repo"/swiftbar/*/*.*.* "$repo"/*/swiftbar/*.*.*; do
   case "$src" in *.md|*.json|*.txt) continue;; esac
   [ -x "$src" ] || { echo "skip (not executable): $src" >&2; continue; }
   dst="$plugin_dir/$(basename "$src")"

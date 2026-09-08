@@ -7,12 +7,10 @@ glue (install script, docs).
 ## Layout
 
 ```
-swiftbar/<utility>/<name>.<interval>.<ext>   SwiftBar plugins, one folder per utility
-scripts/install.sh                           symlinks every plugin into SwiftBar's plugin folder
+swiftbar/<utility>/<name>.<interval>.<ext>   menu-bar-only utilities: one folder per plugin
+<utility>/                                   bigger utilities with their own bin/, scripts/, launchd/, swiftbar/…
+scripts/install.sh                           symlinks every SwiftBar plugin into ~/.swiftbar
 ```
-
-Other kinds of utilities (launchd agents, CLI tools, Shortcuts, …) get their
-own top-level folder when they show up: `bin/`, `launchd/`, and so on.
 
 ## Utilities
 
@@ -27,9 +25,10 @@ scripts/install.sh            # link all plugins into SwiftBar, refresh
 scripts/install.sh --remove   # unlink them again
 ```
 
-The script reads SwiftBar's configured plugin folder from its preferences, so
-it works whatever folder SwiftBar points at. Plugins are symlinked, not copied:
-editing a file in this repo is live on the next refresh.
+All plugins are symlinked into `~/.swiftbar`, a plain folder that SwiftBar is
+pointed at (the script sets that preference and relaunches SwiftBar if it was
+pointing elsewhere). Symlinks, not copies: editing a file in this repo is live
+on the next refresh.
 
 ## Working on a utility
 

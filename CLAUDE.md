@@ -7,12 +7,21 @@ unless two utilities genuinely need the same code.
 
 ## Conventions
 
-- **SwiftBar plugins** go in `swiftbar/<utility>/` and follow SwiftBar's
-  `<name>.<interval>.<ext>` naming (for example `memory.5s.py`). The plugin
-  file is the entry point; helper files sit next to it in the same folder.
-  `scripts/install.sh` symlinks `swiftbar/*/*.*.*` (skipping `.md/.json/.txt`)
-  into SwiftBar's plugin folder, so anything matching that glob must be
-  executable and must be a real plugin.
+- **Two shapes of utility.** A menu-bar-only utility is a folder under
+  `swiftbar/<utility>/` holding the plugin. Anything bigger (its own binaries,
+  launchd jobs, installers) is a top-level folder `<utility>/` with whatever
+  internal layout it needs, and its SwiftBar plugin, if any, in
+  `<utility>/swiftbar/`. `gif-stickers/` is the model for the second shape.
+- **SwiftBar plugins** follow SwiftBar's `<name>.<interval>.<ext>` naming
+  (for example `memory.5s.py`). `scripts/install.sh` symlinks
+  `swiftbar/*/*.*.*` and `*/swiftbar/*.*.*` (skipping `.md/.json/.txt`) into
+  `~/.swiftbar`, so anything matching those globs must be executable and must
+  be a real plugin. `~/.swiftbar` is the single SwiftBar plugin folder on this
+  Mac; never point SwiftBar anywhere else.
+- **Utility-specific installers** (like `git-settings/scripts/install.sh`)
+  handle their own system side (binaries, launchd, sudoers) and link their
+  plugin into `~/.swiftbar` themselves; they must not touch SwiftBar's folder
+  setting beyond making sure it is `~/.swiftbar`.
 - **Python plugins** use `#!/usr/bin/python3` (the system 3.9, no pyenv, no
   third-party packages). SwiftBar runs plugins with a minimal environment, so
   never rely on the user's shell PATH; call binaries by absolute path or by
