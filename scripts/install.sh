@@ -1,20 +1,17 @@
 #!/bin/bash
-# Link every SwiftBar plugin in this repo into SwiftBar's plugin folder.
+# Link every SwiftBar plugin in this repo into the shared plugin folder,
+# ~/.swiftbar, and make sure SwiftBar is pointed at it.
 #
-#   scripts/install.sh            link all plugins (idempotent) and refresh SwiftBar
+#   scripts/install.sh            link all plugins (idempotent), refresh SwiftBar
 #   scripts/install.sh --remove   remove the links this repo created
 #
-# Plugins live in swiftbar/<utility>/<name>.<interval>.<ext>; the repo is the
-# source of truth and SwiftBar sees symlinks, so edits here are live.
+# ~/.swiftbar is a plain folder of symlinks; any repo can drop plugins in it.
+# Plugins live here in swiftbar/<utility>/<name>.<interval>.<ext>; the repo is
+# the source of truth, so edits are live on the next refresh.
 set -euo pipefail
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
-plugin_dir=$(defaults read com.ameba.SwiftBar PluginDirectory 2>/dev/null || true)
-plugin_dir=${plugin_dir/#\~/$HOME}
-if [ -z "$plugin_dir" ]; then
-  echo "SwiftBar has no plugin folder configured yet. Open SwiftBar once, pick a folder, re-run." >&2
-  exit 1
-fi
+plugin_dir="$HOME/.swiftbar"
 mkdir -p "$plugin_dir"
 
 mode=${1:-install}
@@ -34,6 +31,19 @@ for src in "$repo"/swiftbar/*/*.*.*; do
   echo "linked   $dst -> $src"
 done
 
-# Ask SwiftBar to rescan; harmless if it is not running.
-open -g "swiftbar://refreshallplugins" 2>/dev/null || true
+# Point SwiftBar at the shared folder if it is looking elsewhere. SwiftBar only
+# reads this preference at launch, so relaunch it when it changes.
+current=$(defaults read com.ameba.SwiftBar PluginDirectory 2>/dev/null || true)
+if [ "$mode" != "--remove" ] && [ "${current/#\~/$HOME}" != "$plugin_dir" ]; then
+  defaults write com.ameba.SwiftBar PluginDirectory "$plugin_dir"
+  if pgrep -xq SwiftBar; then
+    osascript -e 'quit app "SwiftBar"' 2>/dev/null || true
+    for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -xq SwiftBar || break; sleep 0.5; done
+    sleep 1   # LaunchServices needs a beat after the quit or open fails with -600
+  fi
+  open -a SwiftBar || { sleep 2; open -a SwiftBar; }
+  echo "SwiftBar plugin folder set to $plugin_dir (was: ${current:-unset}); SwiftBar relaunched"
+else
+  open -g "swiftbar://refreshallplugins" 2>/dev/null || true
+fi
 echo "plugin folder: $plugin_dir"
