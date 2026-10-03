@@ -51,3 +51,23 @@ When you need to hand a file back (a rendered preview, an export), write it to
 - For a real look, `screencapture -x -R 0,0,<width>,26 out.png` grabs the
   menu bar. On this Mac (notched display, macOS 26) the item lands to the
   left of the notch, roughly x=640–760 pt.
+
+## Planning docs
+
+`task_plan.md`, `findings.md` and `progress.md` at the root of each worktree
+are gitignored working memory. Read them at session start and keep them
+current. At close-out they are tarballed into the session archive.
+
+## Scratch files
+
+Throwaway artifacts (build output, harness logs, screenshots you made) go in
+`~/.cache/worktrees/mac-utilities/<worktree-name>/`, never the repo. Files for
+the user to look at go in `_tmp/`.
+
+## Close-out ritual
+
+When a work stream is done, run the global `/close-out` skill. This repo's
+paths and gates live in `.claude/close-out.md`. Short version: session summary
+and planning tarball go to `docs/sessions/<date>-<slug>/` with a row in
+`docs/sessions/index.md`, leftovers go to `ROADMAP.md`, all in one
+`chore: close out <slug> session` PR.
