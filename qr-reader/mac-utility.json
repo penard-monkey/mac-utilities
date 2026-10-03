@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "qr-reader",
+  "name": "QR Reader",
+  "version": "1.0.0",
+  "description": "Scan a QR code off the screen and approve what it opens before it opens.",
+  "presentation": "app",
+  "app": {
+    "name": "QR Reader.app",
+    "bundle_id": "com.macutilities.qr-reader"
+  },
+  "plugin": {
+    "path": "swiftbar/qr.1h.py"
+  },
+  "install": {
+    "command": [
+      "scripts/install.sh",
+      "{applications}"
+    ]
+  },
+  "uninstall": {
+    "command": [
+      "scripts/uninstall.sh"
+    ]
+  },
+  "privileged": false
+}
