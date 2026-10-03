@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "id": "git-settings",
+  "name": "Git & SSH",
+  "version": "1.0.0",
+  "description": "Manage global Git defaults, SSH keys and host connections.",
+  "presentation": "app",
+  "app": { "name": "Git & SSH.app", "bundle_id": "com.macutilities.git-settings" },
+  "install": { "command": ["scripts/install.sh", "{applications}"] },
+  "uninstall": { "command": ["scripts/uninstall.sh"] },
+  "privileged": false
+}

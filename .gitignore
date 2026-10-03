@@ -6,3 +6,6 @@
 /task_plan.md
 /findings.md
 /progress.md
+
+/.planning/
+__pycache__/

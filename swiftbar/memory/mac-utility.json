@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "id": "memory",
+  "name": "Memory",
+  "version": "1.0.0",
+  "description": "Memory pressure, swap, and usage in the menu bar.",
+  "presentation": "plugin",
+  "plugin": {"path": "memory.5s.py"},
+  "privileged": false
+}

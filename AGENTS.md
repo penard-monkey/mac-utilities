@@ -13,11 +13,13 @@ unless two utilities genuinely need the same code.
   internal layout it needs, and its SwiftBar plugin, if any, in
   `<utility>/swiftbar/`. `gif-stickers/` is the model for the second shape.
 - **SwiftBar plugins** follow SwiftBar's `<name>.<interval>.<ext>` naming
-  (for example `memory.5s.py`). `scripts/install.sh` symlinks
-  `swiftbar/*/*.*.*` and `*/swiftbar/*.*.*` (skipping `.md/.json/.txt`) into
-  `~/.swiftbar`, so anything matching those globs must be executable and must
-  be a real plugin. `~/.swiftbar` is the single SwiftBar plugin folder on this
-  Mac; never point SwiftBar anywhere else.
+  (for example `memory.5s.py`). Installable utilities declare a
+  `mac-utility.json` manifest next to their README. `scripts/install.sh`
+  delegates selective installation to `utilities-manager`; plugins are linked
+  from stable installed payloads into `~/.swiftbar`. Plugin scripts must be
+  executable. `~/.swiftbar` is the single SwiftBar plugin folder on this Mac;
+  never point SwiftBar anywhere else. No arguments lists installation status;
+  use `install <id>` or the native manager to install a utility.
 - **Utility-specific installers** (like `git-settings/scripts/install.sh`)
   handle their own system side (binaries, launchd, sudoers) and link their
   plugin into `~/.swiftbar` themselves; they must not touch SwiftBar's folder
@@ -26,6 +28,10 @@ unless two utilities genuinely need the same code.
   third-party packages). SwiftBar runs plugins with a minimal environment, so
   never rely on the user's shell PATH; call binaries by absolute path or by
   names that resolve in `/usr/bin:/bin:/usr/sbin:/sbin`.
+- **Installed payloads** live under `~/Library/Application Support/mac-utilities`,
+  with ownership receipts; native apps live in `~/Applications`. Do not point
+  installed tools into disposable development worktrees. Keep apps independent;
+  the shared Tools plugin only launches them.
 - **Per-utility state** lives under `~/.config/mac-utilities/` (settings the
   user chooses) and `~/.cache/mac-utilities/` (regenerable data such as
   history). Name files after the utility.

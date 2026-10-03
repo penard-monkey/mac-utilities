@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "gif-stickers",
+  "name": "GIF Stickers",
+  "version": "1.0.0",
+  "description": "Crop animated GIFs and export compact WebP stickers.",
+  "presentation": "app",
+  "app": {
+    "name": "GIF Stickers.app",
+    "bundle_id": "com.mac-utilities.gif-stickers"
+  },
+  "install": {
+    "command": [
+      "scripts/install.sh",
+      "{applications}"
+    ]
+  },
+  "privileged": false,
+  "dependencies": [
+    {
+      "name": "img2webp",
+      "paths": [
+        "/opt/homebrew/bin/img2webp",
+        "/usr/local/bin/img2webp"
+      ],
+      "help": "Install with brew install webp"
+    }
+  ]
+}
