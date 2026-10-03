@@ -28,6 +28,11 @@ unless two utilities genuinely need the same code.
   third-party packages). SwiftBar runs plugins with a minimal environment, so
   never rely on the user's shell PATH; call binaries by absolute path or by
   names that resolve in `/usr/bin:/bin:/usr/sbin:/sbin`.
+- **Shell scripts** must run under macOS's `/bin/bash` 3.2, which is what
+  users and CI have. With `set -u`, never expand a possibly empty array as
+  `"${arr[@]}"`: use positional parameters (`set -- …; "$@"`) or
+  `${arr[@]+"${arr[@]}"}`. Test scripts with `/bin/bash` explicitly, not the
+  Homebrew bash on your PATH.
 - **Installed payloads** live under `~/Library/Application Support/mac-utilities`,
   with ownership receipts; native apps live in `~/Applications`. Do not point
   installed tools into disposable development worktrees. Keep apps independent;
