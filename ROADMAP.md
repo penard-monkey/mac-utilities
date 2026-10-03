@@ -5,6 +5,18 @@ the session summary that spawned it (see docs/sessions/). Groomed during the
 close-out ritual (global `/close-out` skill; this repo's settings in
 `.claude/close-out.md`).
 
+## Public distribution
+
+- **Complete the deferred cut-over.** Merge manager/removal/archive PRs and the
+  active feature lanes, rebuild the manager, choose a license, rerun the fresh
+  full-history audit and recreate places. Verify hosted PR-ref/cached-view cleanup
+  before changing visibility, or choose a clean replacement if cleanup is unavailable.
+  The user has the detailed private report and kit in the local inbox.
+  ([session](docs/sessions/2026-10-03-publish-prep/summary.md))
+- **User checks the normal shield.** Plugin bytes/link location were verified;
+  the agent did not execute it because it uses administrator commands.
+  ([session](docs/sessions/2026-10-03-publish-prep/summary.md))
+
 ## Git & SSH
 
 - **First-release limits.** Complex existing SSH host blocks open in an external
