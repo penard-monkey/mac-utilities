@@ -13,6 +13,9 @@ Usage:
   scripts/install.sh uninstall memory        remove owned files, retain preferences
   scripts/install.sh menu memory hide        hide menu item, keep utility installed
   scripts/install.sh open gif-stickers       open an installed app
+  scripts/install.sh source list             list catalog source folders
+  scripts/install.sh source add DIR          add a utility repository
+  scripts/install.sh source remove DIR       remove a catalog source (keep installs)
   scripts/install.sh --all                   install all available manifest utilities
   scripts/install.sh --remove                uninstall all owned nonprivileged utilities
   scripts/install.sh manager [destination]   build/install Mac Utilities.app

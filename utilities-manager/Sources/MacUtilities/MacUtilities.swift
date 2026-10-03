@@ -7,6 +7,7 @@ struct Utility: Decodable, Identifiable {
     let name: String
     let description: String
     let available: Bool
+    let source: String?
     let installed: Bool
     let healthy: Bool
     let issue: String?
@@ -23,7 +24,7 @@ struct Utility: Decodable, Identifiable {
     let missingDependencies: [String]
 
     enum CodingKeys: String, CodingKey {
-        case id, name, description, available, installed, healthy, issue, version
+        case id, name, description, available, source, installed, healthy, issue, version
         case availableVersion = "available_version"
         case presentation, visible, app, privileged, commands
         case systemDetected = "system_detected"
@@ -41,7 +42,14 @@ struct Utility: Decodable, Identifiable {
         }
     }
 }
+struct CatalogSource: Decodable, Identifiable {
+    let path: String
+    let primary: Bool
+    let available: Bool
+    var id: String { path }
+}
 struct Catalog: Decodable { let utilities: [Utility] }
+struct SourceCatalog: Decodable { let sources: [CatalogSource] }
 struct BackendFailure: LocalizedError {
     let message: String
     var errorDescription: String? { message }
@@ -50,6 +58,7 @@ struct BackendFailure: LocalizedError {
 @MainActor
 final class ManagerModel: ObservableObject {
     @Published var utilities: [Utility] = []
+    @Published var sources: [CatalogSource] = []
     @Published var source: String
     @Published var busy = false
     @Published var message: String?
@@ -90,6 +99,35 @@ final class ManagerModel: ObservableObject {
         source = url.path
         saveSource()
         Task { await refresh() }
+    }
+
+    func addSource() {
+        let panel = NSOpenPanel()
+        panel.title = "Add a utility repository"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url {
+            Task { await changeSource("add", path: url.path) }
+        }
+    }
+
+    func changeSource(_ action: String, path: String) async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            _ = try await invoke("source", id: action, extra: path)
+            try await loadCatalog()
+            message = action == "add" ? "Catalog source added." : "Catalog source removed. Installed tools are kept."
+        } catch { self.error = error.localizedDescription }
+    }
+
+    private func loadCatalog() async throws {
+        // Sources remain editable even when a utility id clashes or a folder vanishes.
+        sources = try JSONDecoder().decode(SourceCatalog.self, from: await invoke("source", id: "list")).sources
+        utilities = []
+        utilities = try JSONDecoder().decode(Catalog.self, from: await invoke("list")).utilities
     }
 
     private func saveSource() {
@@ -135,7 +173,7 @@ final class ManagerModel: ObservableObject {
         busy = true
         defer { busy = false }
         do {
-            utilities = try JSONDecoder().decode(Catalog.self, from: await invoke("list")).utilities
+            try await loadCatalog()
         } catch { self.error = error.localizedDescription }
     }
 
@@ -147,7 +185,7 @@ final class ManagerModel: ObservableObject {
             let data = try await invoke(action, id: utility.id, extra: extra)
             let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
             message = object?["message"] as? String
-            utilities = try JSONDecoder().decode(Catalog.self, from: await invoke("list")).utilities
+            try await loadCatalog()
         } catch { self.error = error.localizedDescription }
     }
 
@@ -176,6 +214,10 @@ struct UtilityRow: View {
                             .font(.caption).foregroundStyle(utility.installed ? .green : .secondary)
                     }
                     Text(utility.description).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    if let source = utility.source {
+                        Text("Source: \(source)").font(.caption).foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
                     if let version = utility.version {
                         Text("Installed version \(version)").font(.caption).foregroundStyle(.secondary)
                     }
@@ -188,7 +230,7 @@ struct UtilityRow: View {
                             .font(.caption).foregroundStyle(.orange).textSelection(.enabled)
                     }
                     if utility.systemDetected {
-                        Text("Existing Travel Router system files detected. System setup has not been verified.")
+                        Text("Existing system files detected. System setup has not been verified.")
                             .font(.caption).foregroundStyle(.orange)
                     }
                     ForEach(utility.missingDependencies, id: \.self) { dependency in
@@ -262,7 +304,7 @@ struct UtilityRow: View {
             Button("System uninstall completed — remove staged files", role: .destructive) {
                 Task { await model.perform("forget-system", utility: utility) }
             }
-        } message: { Text("Run the Travel Router removal command first. Removing these staged files does not remove system services or change networking.") }
+        } message: { Text("Run the supplied system removal command first. Removing these staged files does not remove system services or change networking.") }
     }
 }
 
@@ -296,14 +338,27 @@ struct ManagerView: View {
                 }.padding(24)
             }
             Divider()
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Install and update source").font(.caption.bold())
-                    Text(model.source).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle).textSelection(.enabled)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Catalog sources").font(.caption.bold())
+                    Spacer()
+                    Button("Bundled source") { model.bundledSource() }.disabled(model.busy)
+                    Button("Choose folder…") { model.chooseSource() }.disabled(model.busy)
+                    Button("Add source…") { model.addSource() }.disabled(model.busy)
                 }
-                Spacer()
-                Button("Bundled source") { model.bundledSource() }.disabled(model.busy)
-                Button("Choose folder…") { model.chooseSource() }.disabled(model.busy)
+                ForEach(model.sources) { source in
+                    HStack {
+                        Text(source.primary ? "Primary" : "Extra").font(.caption).frame(width: 48, alignment: .leading)
+                        Text(source.path).font(.caption).foregroundStyle(.secondary)
+                            .lineLimit(1).truncationMode(.middle).textSelection(.enabled)
+                        if !source.available { Text("Unavailable").font(.caption).foregroundStyle(.orange) }
+                        Spacer()
+                        if !source.primary {
+                            Button("Remove") { Task { await model.changeSource("remove", path: source.path) } }
+                                .disabled(model.busy).help("Remove this source; keep installed tools")
+                        }
+                    }
+                }
             }.padding(16)
         }
         .frame(minWidth: 720, idealWidth: 820, minHeight: 620, idealHeight: 840)

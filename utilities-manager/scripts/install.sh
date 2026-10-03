@@ -23,7 +23,7 @@ import importlib.util, json, pathlib, shutil, subprocess, sys
 repo, dest = map(pathlib.Path, sys.argv[1:])
 spec = importlib.util.spec_from_file_location('lifecycle', repo/'utilities-manager/backend/lifecycle.py')
 module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
-for manifest, source in module.Manager(repo, pathlib.Path.home(), system_effects=False).manifests().values():
+for manifest, source in module.Manager(repo, pathlib.Path.home(), system_effects=False).manifests(roots=[repo]).values():
     target = dest / source.relative_to(repo)
     shutil.copytree(source, target, symlinks=True, ignore=module.IGNORE)
 try:

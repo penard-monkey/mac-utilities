@@ -22,7 +22,8 @@ CATALOG = [
     ("gif-stickers", "GIF Stickers", "Create and export animated stickers."),
     ("git-settings", "Git & SSH", "Manage Git identity and SSH connections."),
 ]
-IGNORE = shutil.ignore_patterns(".git", ".build", ".swiftpm", ".planning", "__pycache__", ".DS_Store")
+IGNORE = shutil.ignore_patterns(".git", ".worktrees", ".worktrees.places.json", ".build", ".swiftpm",
+                               ".planning", "task_plan.md", "findings.md", "progress.md", "__pycache__", ".DS_Store")
 
 class LifecycleError(Exception):
     pass
@@ -72,6 +73,11 @@ def validate(manifest):
         raise LifecycleError("Unknown presentation")
     if not isinstance(manifest.get("privileged", False), bool):
         raise LifecycleError("privileged must be boolean")
+    if "system_paths" in manifest:
+        paths = manifest["system_paths"]
+        if not manifest.get("privileged") or not isinstance(paths, list) or not paths or not all(
+                isinstance(p, str) and Path(p).is_absolute() and ".." not in Path(p).parts and p != "/" for p in paths):
+            raise LifecycleError("system_paths requires a privileged utility and a nonempty list of absolute file paths")
     if "app" in manifest:
         name = manifest["app"]["name"]
         if relative_path(name).name != name or not name.endswith(".app"):
@@ -130,12 +136,13 @@ class Manager:
         if not path.is_symlink():
             return None
         target = path.resolve()
-        expected = self.git_common_dir(self.repo)
-        origin = self.repo / "catalog-origin.json"
+        catalog_source = self.catalog_source(source)
+        expected = self.git_common_dir(catalog_source)
+        origin = catalog_source / "catalog-origin.json"
         if expected is None and origin.is_file():
             expected = Path(json.loads(origin.read_text())["git_common_dir"]).resolve()
         # Both utility-relative path and the shared git repository must match.
-        relative = source.relative_to(self.repo) / manifest["plugin"]["path"]
+        relative = source.relative_to(catalog_source) / manifest["plugin"]["path"]
         if expected is None or not target.is_file():
             return None
         if str(target).endswith("/" + str(relative)) and self.git_common_dir(target.parent) == expected:
@@ -143,10 +150,8 @@ class Manager:
         return None
 
     def external_status(self, manifest):
-        paths = []
-        if manifest and manifest.get("privileged"):
-            paths = []  # historical utility-specific detection removed for privacy
-        return any(p.exists() for p in paths)
+        return bool(manifest and manifest.get("privileged") and any(
+            (self.system_root / p.lstrip("/")).exists() for p in manifest.get("system_paths", [])))
 
     def dependencies(self, manifest):
         missing = []
@@ -155,14 +160,71 @@ class Manager:
                 missing.append(item["name"] + ": " + item["help"])
         return missing
 
-    def manifests(self):
+    def source_paths(self):
+        path = self.config / "sources.json"
+        if not path.exists():
+            return []
+        values = json.loads(path.read_text())
+        if not isinstance(values, list) or not all(isinstance(v, str) and v for v in values):
+            raise LifecycleError("sources.json must be a JSON array of directory paths")
+        result = []
+        for value in values:
+            directory = Path(value).expanduser()
+            if not directory.is_absolute():
+                raise LifecycleError("Catalog source paths must be absolute: " + value)
+            directory = directory.resolve()
+            if directory != self.repo and directory not in result:
+                result.append(directory)
+        return result
+
+    def sources(self):
+        return [{"path": str(p), "primary": p == self.repo, "available": p.is_dir()}
+                for p in [self.repo] + self.source_paths()]
+
+    def catalog_source(self, utility):
+        for directory in sorted([self.repo] + self.source_paths(), key=lambda p: len(p.parts), reverse=True):
+            if utility == directory or directory in utility.parents:
+                return directory
+        raise LifecycleError("Utility is outside the configured catalog sources: " + str(utility))
+
+    def change_source(self, action, value):
+        if action not in ("add", "remove") or not value:
+            raise LifecycleError("source requires list, add <directory>, or remove <directory>")
+        directory = Path(value).expanduser().resolve()
+        sources = self.source_paths()
+        if directory == self.repo:
+            raise LifecycleError("The primary source is selected with --repo or Choose folder in the app")
+        if action == "add":
+            if not directory.is_dir():
+                raise LifecycleError("Source directory does not exist: " + str(directory))
+            if directory not in sources:
+                candidate = sources + [directory]
+                manifests = self.manifests(roots=[self.repo] + candidate)
+                if not any(source == directory or directory in source.parents for _, source in manifests.values()):
+                    raise LifecycleError("No utility manifests found in " + str(directory))
+                sources = candidate
+        else:
+            sources = [p for p in sources if p != directory]
+        atomic_json(self.config / "sources.json", [str(p) for p in sources])
+        return {"message": "Catalog source " + ("added" if action == "add" else "removed"), "sources": self.sources()}
+
+    def manifests(self, roots=None):
         result = {}
         # Only documented utility shapes; no walk into worktrees/build directories.
-        for path in sorted(list(self.repo.glob("*/mac-utility.json")) + list(self.repo.glob("swiftbar/*/mac-utility.json"))):
-            manifest = validate(json.loads(path.read_text()))
-            if manifest["id"] in result:
-                raise LifecycleError("Duplicate manifest id: " + manifest["id"])
-            result[manifest["id"]] = (manifest, path.parent)
+        seen = set()
+        for root in roots if roots is not None else [self.repo] + self.source_paths():
+            paths = list(root.glob("*/mac-utility.json")) + list(root.glob("swiftbar/*/mac-utility.json"))
+            if (root / "mac-utility.json").is_file():
+                paths.append(root / "mac-utility.json")
+            for path in sorted(paths):
+                if path.resolve() in seen:
+                    continue
+                seen.add(path.resolve())
+                manifest = validate(json.loads(path.read_text()))
+                if manifest["id"] in result:
+                    raise LifecycleError("Duplicate manifest id: " + manifest["id"] + " in " +
+                                         str(result[manifest["id"]][1]) + " and " + str(path.parent))
+                result[manifest["id"]] = (manifest, path.parent)
         return result
 
     def receipt(self, utility_id):
@@ -215,7 +277,8 @@ class Manager:
     def catalog(self):
         available = self.manifests()
         entries = []
-        ids = [v[0] for v in CATALOG] + sorted(set(available) - {v[0] for v in CATALOG})
+        installed = {p.stem for p in self.receipts.glob("*.json")}
+        ids = [v[0] for v in CATALOG] + sorted((set(available) | installed) - {v[0] for v in CATALOG})
         defaults = {v[0]: v for v in CATALOG}
         for utility_id in ids:
             record = self.receipt(utility_id)
@@ -231,6 +294,7 @@ class Manager:
                 "id": utility_id, "name": manifest["name"] if manifest else fallback[1],
                 "description": manifest["description"] if manifest else fallback[2],
                 "available": utility_id in available, "installed": record is not None,
+                "source": str(self.catalog_source(available[utility_id][1])) if utility_id in available else (record.get("source") if record else None),
                 "healthy": healthy, "issue": issue,
                 "version": record["version"] if record else None,
                 "available_version": available[utility_id][0]["version"] if utility_id in available else None,
@@ -269,7 +333,7 @@ class Manager:
     def install(self, utility_id):
         available = self.manifests()
         if utility_id not in available:
-            raise LifecycleError("Source is unavailable for " + utility_id + ". Choose a complete mac-utilities checkout.")
+            raise LifecycleError("Source is unavailable for " + utility_id + ". Choose a checkout or add its utility repository.")
         manifest, source = available[utility_id]
         previous = self.receipt(utility_id)
         if previous:
@@ -326,6 +390,7 @@ class Manager:
                 if build.is_dir() and not build.is_symlink():
                     shutil.rmtree(str(build))
             record = {"schema": 1, "id": utility_id, "version": manifest["version"], "manifest": manifest,
+                      "source": str(self.catalog_source(source)),
                       "payload": str(destination), "payload_digest": digest(payload),
                       "visible": previous["visible"] if previous else True}
             if legacy:
@@ -419,7 +484,7 @@ class Manager:
             return {"message": "Already uninstalled"}
         self.verify(record)
         if record["manifest"].get("privileged"):
-            raise LifecycleError("Travel Router system services must be removed in Terminal first. Run the supplied uninstall command, then use 'forget-system' to remove the staged payload. Preferences are retained.")
+            raise LifecycleError(record["manifest"]["name"] + " system services must be removed in Terminal first. Run the supplied uninstall command, then use 'forget-system' to remove the staged payload. Preferences are retained.")
         return self.remove_owned(record)
 
     def remove_owned(self, record):
@@ -454,7 +519,7 @@ class Manager:
         record = self.receipt(utility_id)
         if not record or not record["manifest"].get("privileged"):
             raise LifecycleError("forget-system is only for staged privileged utilities")
-        # The existing Travel Router uninstaller removes our symlink itself.
+        # A privileged uninstaller may have removed our symlink itself.
         plugin = record.get("plugin")
         if plugin and not Path(plugin["path"]).exists() and not Path(plugin["path"]).is_symlink():
             record["visible"] = False
@@ -493,7 +558,7 @@ def main(argv=None):
     parser.add_argument("--home", default=str(Path.home()))
     parser.add_argument("--applications")
     parser.add_argument("--no-system-effects", action="store_true")
-    parser.add_argument("action", choices=("list", "install", "update", "uninstall", "menu", "open", "forget-system", "run-terminal"))
+    parser.add_argument("action", choices=("list", "source", "install", "update", "uninstall", "menu", "open", "forget-system", "run-terminal"))
     parser.add_argument("id", nargs="?")
     parser.add_argument("value", nargs="?")
     args = parser.parse_args(argv)
@@ -501,11 +566,13 @@ def main(argv=None):
         manager = Manager(args.repo, args.home, args.applications, not args.no_system_effects)
         if manager.system_effects and manager.home != Path.home().resolve():
             raise LifecycleError("Alternate homes require --no-system-effects")
-        if args.action != "list" and not args.id:
+        if args.action not in ("list", "source") and not args.id:
             raise LifecycleError("Select a utility id")
         with manager.lock():
             if args.action == "list":
-                result = {"utilities": manager.catalog(), "repo": str(manager.repo)}
+                result = {"utilities": manager.catalog(), "repo": str(manager.repo), "sources": manager.sources()}
+            elif args.action == "source":
+                result = {"sources": manager.sources()} if args.id in (None, "list") else manager.change_source(args.id, args.value)
             elif args.action in ("install", "update"):
                 result = manager.install(args.id)
             elif args.action == "menu":

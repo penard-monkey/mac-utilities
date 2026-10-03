@@ -103,6 +103,33 @@ Dependencies use `{"name":"img2webp","paths":["/opt/homebrew/bin/img2webp",
 "/usr/local/bin/img2webp"],"help":"Install with brew install webp"}`.
 A missing executable is reported in the catalog and window.
 
+## Additional catalog sources
+
+The selected checkout or bundled catalog is the primary source. Add independent
+utility repositories with **Add source…**, and remove extras with **Remove**.
+Each utility row shows its source folder. Removing a source keeps installed
+payloads, receipts, and preferences; updates need its source to be available.
+
+```sh
+scripts/install.sh source list
+scripts/install.sh source add ~/workspace/example-utility
+scripts/install.sh source remove ~/workspace/example-utility
+```
+
+Extra folders live in `~/.config/mac-utilities/sources.json` as a JSON array
+of absolute directory paths. Each is scanned for a root `mac-utility.json`,
+`*/mac-utility.json`, and `swiftbar/*/mac-utility.json`. Duplicate utility IDs
+are errors naming both folders; no source wins silently. A missing folder is
+shown as unavailable and can still be removed. The app bundles only its primary
+catalog, never a user's extra repositories.
+
+Privileged manifests can declare `"system_paths": ["/usr/local/sbin/example",
+"/Library/LaunchDaemons/com.example.service.plist"]`. These absolute paths
+are used only for detecting an existing system installation. The manager
+never writes or deletes them. Without this field no system installation is
+inferred. Privileged hooks remain Terminal commands requiring administrator
+access.
+
 ## Isolated verification
 
 ```sh

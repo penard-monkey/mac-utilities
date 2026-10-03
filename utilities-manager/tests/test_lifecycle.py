@@ -46,6 +46,7 @@ class LifecycleTests(unittest.TestCase):
             plugin.chmod(0o755)
             manifest["plugin"] = {"path": plugin.name}
         if privileged:
+            manifest["system_paths"] = ["/usr/local/sbin/test-service", "/Library/LaunchDaemons/com.example.test.plist"]
             manifest["install"] = {"command": ["scripts/install.sh"]}
             manifest["uninstall"] = {"command": ["scripts/uninstall.sh"]}
             for action in ("install", "uninstall"):
@@ -177,7 +178,7 @@ class LifecycleTests(unittest.TestCase):
 
     def test_privileged_hooks_never_run_and_system_detection_separate(self):
         self.utility("travel-router", privileged=True)
-        system = self.manager.system_root / "usr/local/sbin/travel"
+        system = self.manager.system_root / "usr/local/sbin/test-service"
         system.parent.mkdir(parents=True)
         system.write_text("external")
         result = self.manager.install("travel-router")
@@ -192,6 +193,121 @@ class LifecycleTests(unittest.TestCase):
         (self.manager.plugins / "travel-router.5s.py").unlink()
         self.manager.forget_system("travel-router")
         self.assertTrue(system.exists())
+
+    def external(self, utility_id="external-tool", root_manifest=True):
+        source, manifest = self.utility(utility_id)
+        directory = self.base / (utility_id + " repository")
+        directory.mkdir()
+        target = directory if root_manifest else directory / "swiftbar" / utility_id
+        if not root_manifest:
+            target.mkdir(parents=True)
+        for path in source.iterdir():
+            path.rename(target / path.name)
+        source.rmdir()
+        return directory, target, manifest
+
+    def test_sources_root_and_swiftbar_manifests_install_update_and_remove(self):
+        directory, source, manifest = self.external()
+        nested, _, _ = self.external("nested-tool", root_manifest=False)
+        for folder in (directory, nested):
+            result = self.cli("source", "add", str(folder))
+            self.assertEqual(result.returncode, 0, result.stdout)
+        entry = next(u for u in self.manager.catalog() if u["id"] == "external-tool")
+        self.assertEqual(entry["source"], str(directory))
+        self.assertTrue(entry["available"])
+        worktree_file = directory / ".worktrees/other/private.txt"
+        worktree_file.parent.mkdir(parents=True)
+        worktree_file.write_text("development state must not enter payloads")
+        self.manager.install("external-tool")
+        self.assertFalse((self.manager.payloads / "external-tool/.worktrees").exists())
+        plugin = self.manager.plugins / manifest["plugin"]["path"]
+        self.assertEqual(plugin.resolve(), self.manager.payloads / "external-tool" / plugin.name)
+        (source / plugin.name).write_text("#!/usr/bin/python3\nprint('external update')\n")
+        self.manager.install("external-tool")
+        self.assertIn("external update", plugin.read_text())
+        result = self.cli("source", "remove", str(directory))
+        self.assertEqual(result.returncode, 0, result.stdout)
+        entry = next(u for u in self.manager.catalog() if u["id"] == "external-tool")
+        self.assertFalse(entry["available"])
+        self.assertTrue(entry["installed"])
+        self.assertEqual(entry["source"], str(directory))
+        self.manager.uninstall("external-tool")
+        self.assertFalse(plugin.is_symlink())
+        self.assertIn("nested-tool", self.manager.manifests())
+        self.assertEqual(self.manager.manifests(roots=[self.repo]), {})
+
+    def test_id_clashes_report_both_sources_and_do_not_change_config(self):
+        self.utility()
+        directory, _, _ = self.external("other")
+        path = directory / "mac-utility.json"
+        manifest = json.loads(path.read_text())
+        manifest["id"] = "memory"
+        path.write_text(json.dumps(manifest))
+        result = self.cli("source", "add", str(directory))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Duplicate manifest id: memory", result.stdout)
+        self.assertIn(str(directory), result.stdout)
+        self.assertIn(str(self.repo / "memory"), result.stdout)
+        self.assertFalse((self.manager.config / "sources.json").exists())
+        lifecycle.atomic_json(self.manager.config / "sources.json", [str(directory)])
+        with self.assertRaisesRegex(lifecycle.LifecycleError, "Duplicate manifest id"):
+            self.manager.catalog()
+        self.assertEqual(self.cli("source", "list").returncode, 0)
+        self.assertEqual(self.cli("source", "remove", str(directory)).returncode, 0)
+        self.assertIn("memory", self.manager.manifests())
+
+    def test_source_validation_missing_folder_and_canonical_duplicates(self):
+        directory, _, _ = self.external()
+        self.manager.change_source("add", str(directory))
+        alias = self.base / "alias"
+        alias.symlink_to(directory)
+        self.manager.change_source("add", str(alias))
+        self.assertEqual(self.manager.source_paths(), [directory])
+        moved = self.base / "moved"
+        directory.rename(moved)
+        self.assertFalse(self.manager.sources()[1]["available"])
+        self.assertNotIn("external-tool", self.manager.manifests())
+        self.manager.change_source("remove", str(directory))
+        with self.assertRaises(lifecycle.LifecycleError):
+            self.manager.change_source("add", str(directory))
+        with self.assertRaisesRegex(lifecycle.LifecycleError, "No utility manifests"):
+            self.manager.change_source("add", str(self.home))
+        for invalid in ({"sources": []}, [3], ["relative/path"]):
+            lifecycle.atomic_json(self.manager.config / "sources.json", invalid)
+            with self.assertRaises(lifecycle.LifecycleError): self.manager.manifests()
+
+    def test_external_legacy_plugin_migration_matches_its_repository(self):
+        directory, source, manifest = self.external()
+        subprocess.run(["/usr/bin/git", "init", str(directory)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.manager.change_source("add", str(directory))
+        self.manager.plugins.mkdir()
+        plugin = self.manager.plugins / manifest["plugin"]["path"]
+        plugin.symlink_to(source / plugin.name)
+        self.assertTrue(next(u for u in self.manager.catalog() if u["id"] == manifest["id"])["legacy_plugin"])
+        self.manager.install(manifest["id"])
+        self.assertEqual(plugin.resolve(), self.manager.payloads / manifest["id"] / plugin.name)
+
+    def test_system_paths_are_manifest_specific_and_validated(self):
+        _, manifest = self.utility("service", privileged=True)
+        system = self.manager.system_root / "Library/LaunchDaemons/com.example.test.plist"
+        system.parent.mkdir(parents=True)
+        system.write_text("service")
+        self.assertTrue(self.manager.external_status(manifest))
+        self.assertFalse(self.manager.external_status(dict(manifest, system_paths=["/different/service"])))
+        self.assertFalse(self.manager.external_status(dict(manifest, system_paths=[])))
+        for invalid in ("/absolute/file", [], ["relative/file"], ["/../escape"], [3], ["/"]):
+            with self.assertRaisesRegex(lifecycle.LifecycleError, "system_paths"):
+                lifecycle.validate(dict(manifest, system_paths=invalid))
+        with self.assertRaisesRegex(lifecycle.LifecycleError, "system_paths"):
+            lifecycle.validate(dict(manifest, privileged=False))
+
+    def test_root_script_source_commands_in_isolation(self):
+        directory, _, _ = self.external()
+        options = [str(ROOT_SCRIPT), "--repo", str(self.repo), "--home", str(self.home), "--no-system-effects"]
+        for args in (["source", "add", str(directory)], ["source", "list"], ["install", "external-tool"],
+                     ["source", "remove", str(directory)], ["uninstall", "external-tool"]):
+            result = subprocess.run(options + args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_manifest_traversal_symlinks_and_nonexecutable_plugins_rejected(self):
         source, manifest = self.utility()
