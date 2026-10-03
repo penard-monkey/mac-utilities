@@ -19,8 +19,10 @@ touched, from its folder:
 
 ```sh
 swift test --package-path gif-stickers          # gif-stickers
+swift test --package-path transcribe            # transcribe app core
+/usr/bin/python3 -m unittest discover -s transcribe/engine   # transcribe engine contract
 bash -n scripts/*.sh */scripts/*.sh             # every shell script
-/usr/bin/python3 -m py_compile swiftbar/*/*.py  # Python plugins
+/usr/bin/python3 -m py_compile swiftbar/*/*.py */swiftbar/*.py  # Python plugins
 ```
 
 ## Notes

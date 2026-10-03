@@ -8,6 +8,7 @@ Small, independent tools for this Mac, with a shared installer and Tools menu.
 | [Git & SSH](git-settings/) | Tools → Git & SSH | Machine-level Git settings, SSH keys/hosts, backups and connection diagnostics |
 | [GIF Stickers](gif-stickers/) | Tools → GIF Stickers | Native GIF cropping and WebP sticker export |
 | [Memory](swiftbar/memory/) | Own menu-bar item | Memory usage and pressure, with configurable looks |
+| [Transcribe](transcribe/) | Tools → Transcribe, own menu-bar item | Local audio/video transcription (mlx-whisper), saved next to the file; `transcribe` command |
 | [Tools](swiftbar/tools/) | Shared menu-bar item | Launch installed utility apps and custom app entries |
 
 ## Install
@@ -24,9 +25,11 @@ manager. Apps open in independent native windows. Memory keeps its own status
 item. Hiding an item is separate from uninstalling it.
 
 Requires macOS 14+, Apple's Swift toolchain to build native apps, and SwiftBar
-for menu-bar items. GIF Stickers also needs Homebrew `webp`; the manager reports
-missing dependencies. Privileged utilities from extra repositories retain
-their own administrator setup and removal scripts.
+for menu-bar items. GIF Stickers also needs Homebrew `webp`, and Transcribe needs
+`ffmpeg` and `uv`; the manager reports missing dependencies. Transcribe's
+engine stays installed after the manager removes the app; see its README.
+Privileged utilities from extra repositories retain their own administrator
+setup and removal scripts.
 
 The manager includes a source catalog, so installed tools keep working after
 a development worktree is removed. Select a newer checkout in the manager to

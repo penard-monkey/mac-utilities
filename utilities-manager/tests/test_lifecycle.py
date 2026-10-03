@@ -366,6 +366,30 @@ class LifecycleTests(unittest.TestCase):
         self.assertFalse(next(u for u in entries if u["id"] == "git-settings")["available"])
         self.assertIn("brew install webp", next(u for u in entries if u["id"] == "memory")["missing_dependencies"][0])
 
+    def test_home_relative_dependency_resolves_under_the_managers_home(self):
+        source, manifest = self.utility()
+        manifest["dependencies"] = [{"name": "uv", "paths": ["~/.local/bin/uv"], "help": "Install uv"}]
+        (source / "mac-utility.json").write_text(json.dumps(manifest))
+        memory = lambda: next(u for u in self.manager.catalog() if u["id"] == "memory")
+        self.assertEqual(memory()["missing_dependencies"], ["uv: Install uv"])
+        tool = self.home / ".local/bin/uv"
+        tool.parent.mkdir(parents=True)
+        tool.write_text("#!/bin/sh\n")
+        tool.chmod(0o755)
+        self.assertEqual(memory()["missing_dependencies"], [])
+        self.assertEqual(self.manager.dependency_path("~/.local/bin/uv"), tool)
+
+    def test_dependency_paths_reject_other_relative_forms(self):
+        for bad in ("bin/uv", "./uv", "~", "~/", "~user/bin/uv", "~/../escape/uv", ""):
+            self.assertFalse(lifecycle.dependency_path_ok(bad), bad)
+        for good in ("/opt/homebrew/bin/uv", "~/.local/bin/uv"):
+            self.assertTrue(lifecycle.dependency_path_ok(good), good)
+        source, manifest = self.utility()
+        manifest["dependencies"] = [{"name": "uv", "paths": ["bin/uv"], "help": "Install uv"}]
+        (source / "mac-utility.json").write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(lifecycle.LifecycleError, "absolute or start with ~/"):
+            self.manager.catalog()
+
     def test_root_script_selective_and_bulk_operations_in_isolation(self):
         self.utility()
         self.utility("travel-router", privileged=True)

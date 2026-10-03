@@ -1,8 +1,9 @@
 # Mac Utilities
 
 A native SwiftUI window for selectively installing, updating, opening, and removing
-Mac tooling. It shows five catalog entries: Tools, Memory, Travel Router,
-GIF Stickers, and Git & SSH. Menu visibility is independent of installation.
+Mac tooling. This repository bundles five catalog entries: Tools, Memory,
+GIF Stickers, Git & SSH, and Transcribe. Others, such as Travel Router, come
+from additional catalog sources (below). Menu visibility is independent of installation.
 Apps appear through the Tools launcher; menu-only utilities use SwiftBar.
 
 ## Install and open

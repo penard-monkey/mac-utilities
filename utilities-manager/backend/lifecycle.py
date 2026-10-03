@@ -6,7 +6,7 @@ import fcntl
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shlex
 import shutil
@@ -97,9 +97,21 @@ def validate(manifest):
     for item in manifest.get("dependencies", []):
         if not all(isinstance(item.get(key), str) and item[key] for key in ("name", "help")):
             raise LifecycleError("Dependency requires name and help")
-        if not isinstance(item.get("paths"), list) or not item["paths"] or not all(isinstance(p, str) and Path(p).is_absolute() for p in item["paths"]):
-            raise LifecycleError("Dependency paths must be absolute")
+        if not isinstance(item.get("paths"), list) or not item["paths"] or not all(dependency_path_ok(p) for p in item["paths"]):
+            raise LifecycleError("Dependency paths must be absolute or start with ~/")
     return manifest
+
+def dependency_path_ok(path):
+    """Absolute, or "~/" + a relative path that stays inside the home it is
+    later expanded against (Manager.dependency_path), so manifests can name
+    per-user install locations such as ~/.local/bin without a username."""
+    if not isinstance(path, str) or not path:
+        return False
+    if path.startswith("~/"):
+        rest = PurePosixPath(path[2:])
+        return bool(rest.parts) and not rest.is_absolute() and ".." not in rest.parts
+    return Path(path).is_absolute()
+
 
 class Manager:
     def __init__(self, repo, home, applications=None, system_effects=True, system_root="/"):
@@ -153,10 +165,15 @@ class Manager:
         return bool(manifest and manifest.get("privileged") and any(
             (self.system_root / p.lstrip("/")).exists() for p in manifest.get("system_paths", [])))
 
+    def dependency_path(self, path):
+        # "~/" means the manager's home (--home in isolated runs), never the
+        # invoking user's: os.path.expanduser would leak the real home in.
+        return self.home / path[2:] if path.startswith("~/") else Path(path)
+
     def dependencies(self, manifest):
         missing = []
         for item in (manifest or {}).get("dependencies", []):
-            if not any(Path(p).is_file() and os.access(p, os.X_OK) for p in item["paths"]):
+            if not any(self.dependency_path(p).is_file() and os.access(str(self.dependency_path(p)), os.X_OK) for p in item["paths"]):
                 missing.append(item["name"] + ": " + item["help"])
         return missing
 

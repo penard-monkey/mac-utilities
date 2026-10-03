@@ -1,0 +1,11 @@
+# Runtime deps of mlx-whisper 0.4.3 minus torch: torch is imported only by
+# mlx_whisper/torch_whisper.py (checkpoint conversion), which the engine never
+# loads. mlx-whisper itself is installed with --no-deps by install-engine.sh.
+mlx>=0.11
+numba
+numpy
+tqdm
+more-itertools
+tiktoken
+huggingface_hub
+scipy

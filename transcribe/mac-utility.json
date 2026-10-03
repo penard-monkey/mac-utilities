@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "transcribe",
+  "name": "Transcribe",
+  "version": "1.0.0",
+  "description": "Drop audio or video, get a transcript saved next to the file. Local mlx-whisper engine.",
+  "presentation": "app",
+  "app": { "name": "Transcribe.app", "bundle_id": "com.mac-utilities.transcribe" },
+  "plugin": { "path": "swiftbar/transcribe.10s.py" },
+  "install": { "command": ["scripts/install.sh", "{applications}"] },
+  "uninstall": { "command": ["scripts/uninstall.sh"] },
+  "privileged": false,
+  "dependencies": [
+    {
+      "name": "ffmpeg",
+      "paths": ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"],
+      "help": "Install with brew install ffmpeg"
+    },
+    {
+      "name": "uv",
+      "paths": ["/opt/homebrew/bin/uv", "/usr/local/bin/uv", "~/.local/bin/uv"],
+      "help": "Install with brew install uv"
+    }
+  ]
+}
