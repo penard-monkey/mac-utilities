@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import ImageIO
 import UniformTypeIdentifiers
 
@@ -7,32 +8,59 @@ struct StickerError: LocalizedError {
     var errorDescription: String? { message }
 }
 
-struct GIFAsset {
+/// One animation, read from a GIF or from a short video ("fake GIF" MP4/M4V/MOV).
+/// Immutable after init, so it is shared between the editor and the encoder queue.
+final class AnimationAsset: @unchecked Sendable {
+    static let maxVideoSide = 1024.0   // decoded video frames; a 512 sticker never needs more
+    static let maxVideoFPS = 30.0      // the exporter samples at most 20 fps
+    static let maxVideoSeconds = 10.0  // WhatsApp's animated sticker cap
+    static let videoTypes: [UTType] = [.mpeg4Movie, .quickTimeMovie, UTType("com.apple.m4v-video")].compactMap { $0 }
+    static let openableTypes: [UTType] = [.gif] + videoTypes
+
     let url: URL
-    let source: CGImageSource
     let size: CGSize
     let delays: [Double]
+    /// Length of the whole source. Longer than `duration` when a video was cut at 10 s.
+    let sourceDuration: Double
+    let isVideo: Bool
+    private let source: CGImageSource?
+    private let frames: [CGImage]
     var duration: Double { delays.reduce(0, +) }
+
     init(url: URL) throws {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              CGImageSourceGetType(source) as String? == UTType.gif.identifier,
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
-            throw StickerError(message: "Choose a readable GIF file.")
+        self.url = url
+        if let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+           CGImageSourceGetType(source) as String? == UTType.gif.identifier {
+            guard let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+                throw StickerError(message: "Choose a readable GIF file.")
+            }
+            let count = CGImageSourceGetCount(source)
+            guard count > 0, count <= 10000, image.width <= 8192, image.height <= 8192 else {
+                throw StickerError(message: "This GIF is too large. Use up to 8192 pixels per side and 10,000 frames.")
+            }
+            self.source = source; frames = []; isVideo = false
+            size = CGSize(width: image.width, height: image.height)
+            delays = (0..<count).map { index in
+                let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [String: Any]
+                let gif = properties?[kCGImagePropertyGIFDictionary as String] as? [String: Any]
+                let delay = gif?[kCGImagePropertyGIFUnclampedDelayTime as String] as? Double
+                    ?? gif?[kCGImagePropertyGIFDelayTime as String] as? Double ?? 0.1
+                return delay.isFinite ? max(0.008, delay) : 0.1
+            }
+            sourceDuration = delays.reduce(0, +)
+            return
         }
-        let count = CGImageSourceGetCount(source)
-        guard count > 0, count <= 10000, image.width <= 8192, image.height <= 8192 else {
-            throw StickerError(message: "This GIF is too large. Use up to 8192 pixels per side and 10,000 frames.")
-        }
-        self.url = url; self.source = source
-        size = CGSize(width: image.width, height: image.height)
-        delays = (0..<count).map { index in
-            let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [String: Any]
-            let gif = properties?[kCGImagePropertyGIFDictionary as String] as? [String: Any]
-            let delay = gif?[kCGImagePropertyGIFUnclampedDelayTime as String] as? Double
-                ?? gif?[kCGImagePropertyGIFDelayTime as String] as? Double ?? 0.1
-            return delay.isFinite ? max(0.008, delay) : 0.1
-        }
+        let video = try Self.decodeVideo(url)
+        source = nil; isVideo = true
+        frames = video.frames; delays = video.delays; sourceDuration = video.sourceDuration
+        size = CGSize(width: video.frames[0].width, height: video.frames[0].height)
     }
+
+    func image(at index: Int) -> CGImage? {
+        if let source { return CGImageSourceCreateImageAtIndex(source, index, nil) }
+        return frames.indices.contains(index) ? frames[index] : nil
+    }
+
     func frame(at time: Double) -> Int {
         var end = 0.0
         for (index, delay) in delays.enumerated() {
@@ -40,6 +68,38 @@ struct GIFAsset {
             if time < end { return index }
         }
         return delays.count - 1
+    }
+
+    /// Samples the first 10 s at the video's own frame rate (capped at 30 fps), upright and
+    /// scaled to at most 1024 px. Audio is ignored.
+    private static func decodeVideo(_ url: URL) throws -> (frames: [CGImage], delays: [Double], sourceDuration: Double) {
+        let unreadable = StickerError(message: "Choose a GIF or a short video (MP4, M4V or MOV).")
+        let asset = AVURLAsset(url: url)
+        guard let track = asset.tracks(withMediaType: .video).first else { throw unreadable }
+        let seconds = CMTimeGetSeconds(asset.duration)
+        guard seconds.isFinite, seconds > 0 else { throw unreadable }
+        let nominal = Double(track.nominalFrameRate)
+        let fps = min(maxVideoFPS, nominal.isFinite && nominal > 0 ? nominal : maxVideoFPS)
+        let clip = min(seconds, maxVideoSeconds)
+        let count = max(1, Int((clip * fps).rounded(.down)))
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: maxVideoSide, height: maxVideoSide)
+        let tolerance = CMTime(seconds: 0.5 / fps, preferredTimescale: 600)
+        generator.requestedTimeToleranceBefore = tolerance
+        generator.requestedTimeToleranceAfter = tolerance
+        var frames: [CGImage] = []
+        frames.reserveCapacity(count)
+        for index in 0..<count {
+            let time = CMTime(seconds: Double(index) / fps, preferredTimescale: 600)
+            do { frames.append(try generator.copyCGImage(at: time, actualTime: nil)) }
+            catch {
+                // A file can report a little more duration than it has frames; keep what decoded.
+                if frames.isEmpty { throw StickerError(message: "Could not decode this video: \(error.localizedDescription)") }
+                break
+            }
+        }
+        return (frames, Array(repeating: 1 / fps, count: frames.count), seconds)
     }
 }
 
@@ -102,12 +162,15 @@ enum Encoder {
         throw StickerError(message: "WebP encoder is missing. Install it with Homebrew: brew install webp")
     }
     static func export(url: URL, framing: Framing, cancelled: () -> Bool = { false }) throws -> ExportResult {
+        if cancelled() { throw CancellationError() }
+        return try export(asset: AnimationAsset(url: url), framing: framing, cancelled: cancelled)
+    }
+    static func export(asset: AnimationAsset, framing: Framing, cancelled: () -> Bool = { false }) throws -> ExportResult {
         func checkCancellation() throws {
             if cancelled() { throw CancellationError() }
         }
         try checkCancellation()
         let executable = try tool()
-        let asset = try GIFAsset(url: url)
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("gif-stickers-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -122,8 +185,8 @@ enum Encoder {
                 try checkCancellation()
                 let delay = base + (index < extra ? 1 : 0)
                 let imageIndex = asset.frame(at: Double(timestamp)/1000)
-                guard let image = CGImageSourceCreateImageAtIndex(asset.source, imageIndex, nil) else {
-                    throw StickerError(message: "Could not decode GIF frame \(imageIndex + 1).")
+                guard let image = asset.image(at: imageIndex) else {
+                    throw StickerError(message: "Could not decode frame \(imageIndex + 1).")
                 }
                 let rendered = try framing.render(image)
                 let path = directory.appendingPathComponent("frame-\(index).png")
@@ -161,11 +224,11 @@ enum Encoder {
                 }
                 if data.count <= cap {
                     return ExportResult(data: data, duration: Double(metadata.delays.reduce(0, +))/1000, fps: fps,
-                        quality: quality, frameCount: max(1, metadata.delays.count), trimmed: asset.duration > 10)
+                        quality: quality, frameCount: max(1, metadata.delays.count), trimmed: asset.sourceDuration > 10)
                 }
             }
         }
-        throw StickerError(message: "Could not meet the sticker size limit, even at minimum quality and 1 fps. Try a simpler crop or shorter GIF.")
+        throw StickerError(message: "Could not meet the sticker size limit, even at minimum quality and 1 fps. Try a simpler crop or a shorter animation.")
     }
 }
 

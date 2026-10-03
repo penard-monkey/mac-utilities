@@ -19,11 +19,13 @@ It does not change your default GIF application or install a background job.
 
 ## Use
 
-1. Choose **File → Open GIF…** (⌘O), or drop a GIF onto the window or Dock icon.
+1. Choose **File → Open GIF or Video…** (⌘O), or drop a file onto the window or
+   Dock icon. Besides GIFs, it takes the short looping videos many sites serve as
+   "GIFs" (MP4, M4V or MOV).
 2. In **Crop**, drag the square to choose its position. Drag the bottom-right
-   corner to resize it, or scroll over the GIF to zoom around the square's center.
-   The source GIF retains its aspect ratio. **Reset** centers the largest square.
-3. Choose **Fit with transparent padding** to include the entire GIF.
+   corner to resize it, or scroll over the animation to zoom around the square's center.
+   The source keeps its aspect ratio. **Reset** centers the largest square.
+3. Choose **Fit with transparent padding** to include the whole frame.
 4. Wait for the looping **512 × 512** preview. It plays the actual encoded WebP,
    with checkerboard behind transparent pixels. Changing the frame clears the old
    preview and prepares a new one after a short pause.
@@ -33,15 +35,21 @@ It does not change your default GIF application or install a background job.
 The status line reports encoded size, actual duration and frame count, sampling
 rate, quality, and whether the input was trimmed. Export stays disabled until
 there is a current, successful preview. GIFs over 8192 pixels per side or 10,000
-frames are rejected; corrupt GIFs and missing encoder tools produce a clear error.
+frames are rejected; corrupt files and missing encoder tools produce a clear error.
 
 ## Conversion
 
-ImageIO decodes GIFs and CoreGraphics crops/scales each sampled frame to 512×512.
+ImageIO decodes GIFs. Videos are decoded with AVFoundation when the file is opened:
+the first 10 seconds at the video's own frame rate, capped at 30 fps, upright as
+recorded and scaled to at most 1024 pixels on the long side. Audio is ignored. A
+video longer than 10 seconds is cut at 10 seconds and the status line says so.
+From there both kinds go through the same steps.
+
+CoreGraphics crops/scales each sampled frame to 512×512.
 Fit uses a transparent canvas. ImageIO on the development Mac can read WebP but
 cannot write it, so `img2webp` encodes PNG frames in a private temporary directory
 which is removed after each conversion. There is no ffmpeg runtime dependency,
-network upload, or persistent copy of your GIF.
+network upload, or persistent copy of your file.
 
 The exporter samples the first 10 seconds, starting at 20 fps. It tries lossy
 quality 90, 75, 55, 35, 15, then 1 before reducing the sampling rate to 15, 10, 6,

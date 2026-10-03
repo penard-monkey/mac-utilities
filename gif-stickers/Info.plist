@@ -16,5 +16,11 @@
 <key>LSHandlerRank</key><string>Alternate</string>
 <key>LSItemContentTypes</key><array><string>com.compuserve.gif</string></array>
 <key>CFBundleTypeExtensions</key><array><string>gif</string></array>
+</dict><dict>
+<key>CFBundleTypeName</key><string>Looping Video</string>
+<key>CFBundleTypeRole</key><string>Viewer</string>
+<key>LSHandlerRank</key><string>Alternate</string>
+<key>LSItemContentTypes</key><array><string>public.mpeg-4</string><string>com.apple.m4v-video</string><string>com.apple.quicktime-movie</string></array>
+<key>CFBundleTypeExtensions</key><array><string>mp4</string><string>m4v</string><string>mov</string></array>
 </dict></array>
 </dict></plist>

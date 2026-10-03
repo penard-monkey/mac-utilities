@@ -12,39 +12,54 @@ final class CancellationFlag: @unchecked Sendable {
 }
 
 @MainActor final class EditorModel: ObservableObject {
-    @Published var asset: GIFAsset?
+    @Published var asset: AnimationAsset?
     @Published var framing = Framing()
     @Published var result: ExportResult?
     @Published var busy = false
-    @Published var message = "Open a GIF to begin."
+    @Published var message = "Open a GIF or a looping video to begin."
     @Published var error: String?
     private var pending: Task<Void, Never>?
     private var revision = 0
     private var cancellation = CancellationFlag()
     private let queue = DispatchQueue(label: "gif-stickers.encoder", qos: .userInitiated)
     func openPanel() {
-        let panel = NSOpenPanel(); panel.allowedContentTypes = [.gif]; panel.allowsMultipleSelection = false
+        let panel = NSOpenPanel(); panel.allowedContentTypes = AnimationAsset.openableTypes; panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url { load(url) }
     }
     func load(_ url: URL) {
-        do {
-            asset = try GIFAsset(url: url)
-            framing = .centered(asset!.size)
-            error = nil
-            update()
-        } catch { self.error = error.localizedDescription }
+        // Videos are decoded up front, which takes a moment, so never on the main thread.
+        pending?.cancel(); cancellation.cancel(); revision += 1
+        let version = revision
+        busy = true; result = nil; message = "Opening \(url.lastPathComponent)…"
+        queue.async {
+            let loaded = Result { try AnimationAsset(url: url) }
+            Task { @MainActor in
+                guard version == self.revision else { return }
+                switch loaded {
+                case .success(let asset):
+                    self.asset = asset
+                    self.framing = .centered(asset.size)
+                    self.error = nil
+                    self.update()
+                case .failure(let error):
+                    self.busy = false
+                    self.error = error.localizedDescription
+                    self.message = self.asset == nil ? "Open a GIF or a looping video to begin." : "Kept the previous file."
+                }
+            }
+        }
     }
     func update() {
         pending?.cancel(); cancellation.cancel(); cancellation = CancellationFlag(); revision += 1
         result = nil
         guard let asset else { return }
         busy = true; message = "Preparing sticker preview…"
-        let url = asset.url, frame = framing, version = revision
+        let frame = framing, version = revision
         let cancellation = cancellation
         pending = Task {
             do { try await Task.sleep(nanoseconds: 350_000_000) } catch { return }
             queue.async {
-                let output = Result { try Encoder.export(url: url, framing: frame, cancelled: { cancellation.cancelled }) }
+                let output = Result { try Encoder.export(asset: asset, framing: frame, cancelled: { cancellation.cancelled }) }
                 Task { @MainActor in
                     guard version == self.revision else { return }
                     self.busy = false
@@ -110,7 +125,7 @@ final class CancellationFlag: @unchecked Sendable {
         }.defaultSize(width: 1130, height: 730)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Open GIF…", action: model.openPanel).keyboardShortcut("o")
+                Button("Open GIF or Video…", action: model.openPanel).keyboardShortcut("o")
             }
             CommandGroup(replacing: .saveItem) {
                 Button("Export Sticker…", action: model.save).keyboardShortcut("s")
@@ -134,7 +149,7 @@ struct Checkerboard: View {
 }
 
 struct GIFCanvas: View {
-    let asset: GIFAsset
+    let asset: AnimationAsset
     @Binding var framing: Framing
     @State private var dragStart: Framing?
     @State private var resizeStart: Framing?
@@ -147,7 +162,7 @@ struct GIFCanvas: View {
                 Checkerboard()
                 TimelineView(.animation(minimumInterval: 1/30)) { timeline in
                     let time = timeline.date.timeIntervalSince(epoch).truncatingRemainder(dividingBy: asset.duration)
-                    if let image = CGImageSourceCreateImageAtIndex(asset.source, asset.frame(at: time), nil) {
+                    if let image = asset.image(at: asset.frame(at: time)) {
                         Image(decorative: image, scale: 1).resizable().frame(width: size.width, height: size.height)
                     }
                 }
@@ -241,17 +256,17 @@ struct EditorView: View {
                     Text(model.asset?.url.lastPathComponent ?? "Turn an animation into a WhatsApp sticker.").foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Open GIF…", action: model.openPanel)
+                Button("Open…", action: model.openPanel)
             }
             HStack(alignment: .top, spacing: 28) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Frame your GIF").font(.headline)
+                    Text("Frame your animation").font(.headline)
                     ZStack {
                         RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.06))
                         if let asset = model.asset {
                             GIFCanvas(asset: asset, framing: $model.framing).padding(14)
                         } else {
-                            Text("Drop a GIF here\nor use File → Open").multilineTextAlignment(.center).foregroundStyle(.secondary)
+                            Text("Drop a GIF or a looping video here\n(MP4, M4V, MOV) or use File → Open").multilineTextAlignment(.center).foregroundStyle(.secondary)
                         }
                     }.frame(minWidth: 360, maxWidth: .infinity).frame(height: 512)
                     Text("Drag the square to pan · drag its corner or scroll to zoom").font(.caption).foregroundStyle(.secondary)
