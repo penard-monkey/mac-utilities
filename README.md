@@ -20,11 +20,13 @@ open "$HOME/Applications/Mac Utilities.app"
 ```
 
 Then install **Git & SSH**, **GIF Stickers**, or any other utility from the
-manager. Apps open in independent native windows. Memory keeps its own status item. Hiding an item is separate from uninstalling it.
+manager. Apps open in independent native windows. Memory keeps its own status
+item. Hiding an item is separate from uninstalling it.
 
 Requires macOS 14+, Apple's Swift toolchain to build native apps, and SwiftBar
 for menu-bar items. GIF Stickers also needs Homebrew `webp`; the manager reports
-missing dependencies. Privileged utilities retain their own administrator setup and removal scripts.
+missing dependencies. Privileged utilities from extra repositories retain
+their own administrator setup and removal scripts.
 
 The manager includes a source catalog, so installed tools keep working after
 a development worktree is removed. Select a newer checkout in the manager to
@@ -46,6 +48,12 @@ scripts/install.sh menu memory hide
 scripts/install.sh menu memory show
 scripts/install.sh uninstall git-settings
 ```
+
+With external catalog support, add an independent utility repository in the
+manager with **Add source…**, or run `scripts/install.sh source add <folder>`.
+Sources are recorded in `~/.config/mac-utilities/sources.json`; duplicate
+utility IDs are reported explicitly. Extra repositories are kept out of the
+manager's bundled catalog. See [catalog sources](utilities-manager/#additional-catalog-sources).
 
 The old no-argument blanket plugin-link operation now lists status. Explicit
 `--all` installs available utilities; `--remove` removes managed nonprivileged

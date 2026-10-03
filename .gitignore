@@ -9,3 +9,6 @@
 
 /.planning/
 __pycache__/
+
+# Local shared inbox; its target can contain personal machine paths.
+/_tmp

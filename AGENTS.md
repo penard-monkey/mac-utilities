@@ -11,7 +11,7 @@ unless two utilities genuinely need the same code.
   `swiftbar/<utility>/` holding the plugin. Anything bigger (its own binaries,
   launchd jobs, installers) is a top-level folder `<utility>/` with whatever
   internal layout it needs, and its SwiftBar plugin, if any, in
-  `<utility>/swiftbar/`. `gif-stickers/` is the model for the second shape.
+  `<utility>/swiftbar/`. `gif-stickers/` and `git-settings/` model the second shape.
 - **SwiftBar plugins** follow SwiftBar's `<name>.<interval>.<ext>` naming
   (for example `memory.5s.py`). Installable utilities declare a
   `mac-utility.json` manifest next to their README. `scripts/install.sh`
@@ -43,9 +43,10 @@ unless two utilities genuinely need the same code.
 
 ## Sharing files with the assistant
 
-`_tmp` is a local, gitignored inbox symlink to a folder the user shares across
+`_tmp` is a local, gitignored symlink to a folder the user shares across
 projects. Screenshots, logs, and other files the user wants looked at are
-dropped there; read them from `_tmp/<file>`. Neither the symlink nor its contents belong in git, so treat it as an inbox, not a place for project files.
+dropped there; read them from `_tmp/<file>`. Keep the symlink and its target
+out of git, and leave existing links on disk. Treat it as an inbox, not a place for project files.
 When you need to hand a file back (a rendered preview, an export), write it to
 `_tmp/` as well.
 
