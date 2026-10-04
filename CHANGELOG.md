@@ -2,6 +2,11 @@
 
 ## [1.1.0]
 
+- GIF Stickers: save exports into a configurable sticker library with animated
+  previews, validated WebP imports, copy/reveal actions and confirmed Trash.
+- Send previewed or saved stickers to your own WhatsApp chat through SayWhat's
+  signed daemon, with confirmation, connection help and readable errors.
+
 - GIF Stickers: click or use the keyboard to open a file from the empty frame,
   and choose a replacement without interfering with cropping or drag and drop.
 

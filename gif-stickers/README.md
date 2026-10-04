@@ -31,8 +31,10 @@ It does not change your default GIF application or install a background job.
 4. Wait for the looping **512 × 512** preview. It plays the actual encoded WebP,
    with checkerboard behind transparent pixels. Changing the frame clears the old
    preview and prepares a new one after a short pause.
-5. **Export Sticker…** (⌘S) saves exactly that preview, copies the WebP data and
-   file URL to the clipboard, and reveals the file in Finder.
+5. **Export Sticker…** (⌘S) saves exactly that preview, also saves a copy in the
+   library, copies the WebP data and file URL to the clipboard, and reveals the
+   export in Finder. **Send to my WhatsApp** sends the preview through SayWhat
+   after confirmation, without requiring an export first.
 
 The status line reports encoded size, actual duration and frame count, sampling
 rate, quality, and whether the input was trimmed. Export stays disabled until
@@ -51,7 +53,8 @@ CoreGraphics crops/scales each sampled frame to 512×512.
 Fit uses a transparent canvas. ImageIO on the development Mac can read WebP but
 cannot write it, so `img2webp` encodes PNG frames in a private temporary directory
 which is removed after each conversion. There is no ffmpeg runtime dependency,
-network upload, or persistent copy of your file.
+upload during conversion. Exports persist as WebP files and library copies;
+source GIFs and videos are not copied into the library.
 
 The exporter samples the first 10 seconds, starting at 20 fps. It tries lossy
 quality 90, 75, 55, 35, 15, then 1 before reducing the sampling rate to 15, 10, 6,
@@ -71,11 +74,54 @@ frame durations ≥8 ms, and static files ≤100 KB. This app uses conservative 
 limits of 500,000 and 100,000 bytes. It loops animated output indefinitely. Pick a
 strong first frame: WhatsApp rests on that frame after playback.
 
-## Getting the sticker into WhatsApp
+## Sticker library
+
+Choose **Library** at the top of the window for a grid of saved stickers. The
+previews play the actual WebP, including animation and transparency. Every
+successful export also saves a separate library copy with a unique filename.
+The default folder is `~/Pictures/GIF Stickers`. **Choose Folder…** changes it;
+the absolute path is stored as `library_folder` in
+`~/.config/mac-utilities/gif-stickers.json`. Changing folders shows the new
+folder and leaves existing stickers in their original location.
+
+Drop existing **512 × 512 WebP** files into the library to import copies.
+Dimensions, container integrity, frame timing, duration and the static/animated
+size caps are validated. Originals stay in place. Invalid files are refused;
+invalid WebPs already in the folder are skipped. **Refresh** picks up changes
+made outside the app.
+
+Each sticker offers **Send to my WhatsApp**, **Copy**, and a **More** menu with
+**Reveal in Finder** and **Delete…**. Deletion asks for confirmation and moves
+only that library file to Trash, where Finder can restore it. It leaves any
+separate export or original import intact.
+
+## Send through SayWhat
+
+Sending is optional. Run [SayWhat](https://github.com/penard-monkey/saywhat) with
+its signed-send daemon at `http://127.0.0.1:3220` and WhatsApp paired. GIF
+Stickers uses its self-only `POST /send` endpoint; SayWhat owns the WhatsApp
+session and recipient selection. GIF Stickers never contacts GOWA directly.
+
+The app reads `~/.local/share/saywhat/send.secret` only when a confirmed send
+starts. It signs the timestamp and exact multipart bytes with HMAC-SHA256;
+the key is never copied into app settings, logs or the library. No recipient
+field is sent. The button is disabled with an explanation if the secret is
+missing, the daemon is unavailable or WhatsApp is disconnected. Use
+**Refresh SayWhat** after starting or reconnecting it.
+
+Choose **Send to my WhatsApp** beside the preview or on a library sticker,
+then confirm. The exact WebP is sent as a sticker to your own WhatsApp chat.
+Open that chat **on your phone**, tap the received sticker and add it to
+**Favourites** to reuse it from WhatsApp's sticker picker. A failed or uncertain
+send is shown in the app; check the chat before retrying an uncertain delivery.
+Sending is tested against local stub servers only; the first real send is a
+user action after release.
+
+## Transfer without SayWhat
 
 The export is a compatible image file, not an installed sticker pack. Copying or
 dropping a `.webp` into a Desktop chat is **not a verified sticker-import path**;
-it may attach it as a file or image. The app does not send messages.
+it may attach it as a file or image.
 
 The documented route is to transfer the WebP to your phone (for example with
 AirDrop), import it using a sticker maker that explicitly accepts **animated WebP**,
@@ -87,9 +133,8 @@ describes sticker-maker apps as an alternative to building a pack app, and
 packs on Android/iOS. Packs contain 3–30 stickers and must not mix static and
 animated stickers. This utility exports individual files and does not build packs.
 
-Research checked on 2026-10-02. Direct animated-WebP import on WhatsApp Desktop
-for macOS remains unverified; no messaging integration or chat-send testing is
-included.
+Direct animated-WebP file import on WhatsApp Desktop for macOS remains
+unverified. SayWhat sends through its own paired WhatsApp session instead.
 
 ## Development and verification
 
@@ -102,6 +147,11 @@ swift test
 Tests generate GIFs locally and independently inspect output using Homebrew
 `webpmux`, covering square canvas, animation, transparent fit padding, static size,
 10-second trimming, minimum frame duration, crop bounds, and invalid input.
+Library tests use temporary homes and a fake Trash. Signed-send tests use
+ephemeral loopback HTTP servers and temporary fake secrets, verifying exact
+multipart bytes and signature, key rotation, availability, confirmation
+cancellation, redirects and readable errors. They never read the real secret
+or send a real WhatsApp message.
 
 In an environment that cannot run SwiftPM's nested sandbox, use
 `swift test --disable-sandbox`. For the installer in that environment, set
