@@ -243,7 +243,7 @@ struct WebPMetadata {
             (0..<count).reduce(0) { $0 | Int(bytes[offset+$1]) << (8*$1) }
         }
         guard bytes.count >= 20, String(bytes: bytes[0..<4], encoding: .ascii) == "RIFF",
-              String(bytes: bytes[8..<12], encoding: .ascii) == "WEBP" else {
+              String(bytes: bytes[8..<12], encoding: .ascii) == "WEBP", uint(4, 4) + 8 == bytes.count else {
             throw StickerError(message: "Encoder did not produce a WebP file.")
         }
         var offset = 12, delays: [Int] = [], canvas: (Int, Int)?
@@ -255,6 +255,7 @@ struct WebPMetadata {
             if name == "ANMF", length >= 16 { delays.append(uint(offset+20, 3)) }
             offset += 8 + length + length%2
         }
+        guard offset == bytes.count else { throw StickerError(message: "Incomplete WebP output.") }
         if let canvas { width = canvas.0; height = canvas.1 }
         else if let source = CGImageSourceCreateWithData(data as CFData, nil),
                 let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],

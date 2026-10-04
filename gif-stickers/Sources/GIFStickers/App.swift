@@ -12,6 +12,7 @@ final class CancellationFlag: @unchecked Sendable {
 }
 
 @MainActor final class EditorModel: ObservableObject {
+    let library = LibraryModel()
     @Published var asset: AnimationAsset?
     @Published var framing = Framing()
     @Published var result: ExportResult?
@@ -79,14 +80,17 @@ final class CancellationFlag: @unchecked Sendable {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try result.data.write(to: url, options: .atomic)
-            let clipboard = NSPasteboard.general
-            clipboard.clearContents()
-            let item = NSPasteboardItem()
-            item.setData(result.data, forType: NSPasteboard.PasteboardType("org.webmproject.webp"))
-            item.setString(url.absoluteString, forType: .fileURL)
-            clipboard.writeObjects([item])
+            do {
+                try library.store.save(result.data, name: url.lastPathComponent)
+                library.refresh()
+            } catch {
+                self.error = "The export was saved, but the library copy failed: " + error.localizedDescription
+                message = "Export saved; library copy failed."
+                return
+            }
+            copySticker(result.data, url: url)
             NSWorkspace.shared.activateFileViewerSelecting([url])
-            message = "Saved, copied and revealed · " + result.summary
+            message = "Saved to export and library, copied and revealed · " + result.summary
         } catch { self.error = error.localizedDescription }
     }
 }
@@ -113,7 +117,7 @@ final class CancellationFlag: @unchecked Sendable {
     @StateObject private var model = EditorModel()
     var body: some Scene {
         Window("GIF Stickers", id: "editor") {
-            EditorView(model: model)
+            WorkspaceView(model: model)
                 .onAppear {
                     delegate.attach(model)
                     NSApplication.shared.setActivationPolicy(.regular)
@@ -122,7 +126,7 @@ final class CancellationFlag: @unchecked Sendable {
                         model.load(URL(fileURLWithPath: path))
                     }
                 }
-        }.defaultSize(width: 1130, height: 730)
+        }.defaultSize(width: 1130, height: 850)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Open GIF or Video…", action: model.openPanel).keyboardShortcut("o")
@@ -238,7 +242,7 @@ struct WebPPreview: NSViewRepresentable {
         context.coordinator.data = data
         view.loadHTMLString("""
         <html><meta name="viewport" content="width=device-width, initial-scale=1"><style>
-        html,body{margin:0;overflow:hidden;background:transparent}img{width:512px;height:512px;display:block}
+        html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}img{width:100%;height:100%;object-fit:contain;display:block}
         </style><img src="data:image/webp;base64,\(data.base64EncodedString())"></html>
         """, baseURL: nil)
     }
@@ -248,6 +252,7 @@ struct WebPPreview: NSViewRepresentable {
 
 struct EditorView: View {
     @ObservedObject var model: EditorModel
+    @ObservedObject var sender: SendModel
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
@@ -304,6 +309,10 @@ struct EditorView: View {
                     Button("Reset") { model.framing = .centered(asset.size) }
                 }
                 Spacer()
+                Button("Send to my WhatsApp") {
+                    if let result = model.result { sender.prepare(result.data) }
+                }.disabled(model.result == nil || model.busy || sender.busy || !sender.availability.ready)
+                    .help(sender.availability.explanation)
                 Button("Export Sticker…", action: model.save).buttonStyle(.borderedProminent)
                     .disabled(model.result == nil || model.busy)
             }
