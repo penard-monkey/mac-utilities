@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.1]
+
+- Tools: the menu bar glyph is drawn at 18 pt instead of twice that size.
+
 ## [1.1.0]
 
 - GIF Stickers: save exports into a configurable sticker library with animated

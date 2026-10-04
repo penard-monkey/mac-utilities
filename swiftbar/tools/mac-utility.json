@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "tools",
   "name": "Tools",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "One menu for native utilities and the Mac Utilities manager.",
   "presentation": "launcher",
   "plugin": { "path": "tools.1m.py" },

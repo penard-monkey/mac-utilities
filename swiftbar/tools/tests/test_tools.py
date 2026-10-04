@@ -1,5 +1,7 @@
+import base64
 import importlib.util
 import json
+import struct
 from pathlib import Path
 import tempfile
 import unittest
@@ -57,6 +59,40 @@ class ToolsTests(unittest.TestCase):
         with patch.object(tools.sys, 'argv', ['plugin', '--launch', str(app)]):
             with self.assertRaises(ValueError):
                 tools.main()
+
+    def test_menu_icon_png_has_correct_dpi(self):
+        """Verify MENU_ICON PNG has 144 dpi (5669 px/m) pHYs chunk."""
+        png_bytes = base64.b64decode(tools.MENU_ICON)
+        
+        # Parse PNG chunks
+        pos = 8  # Skip signature
+        has_ihdr = False
+        has_physs = False
+        has_exif = False
+        
+        while pos < len(png_bytes):
+            length = struct.unpack('>I', png_bytes[pos:pos+4])[0]
+            chunk_type = png_bytes[pos+4:pos+8]
+            chunk_data = png_bytes[pos+8:pos+8+length]
+            
+            if chunk_type == b'IHDR':
+                width, height = struct.unpack('>II', chunk_data[:8])
+                self.assertEqual((width, height), (36, 36))
+                has_ihdr = True
+            elif chunk_type == b'pHYs':
+                px_x, px_y, unit = struct.unpack('>IIB', chunk_data)
+                self.assertEqual(px_x, 5669)
+                self.assertEqual(px_y, 5669)
+                self.assertEqual(unit, 1)
+                has_physs = True
+            elif chunk_type == b'eXIf':
+                has_exif = True
+            
+            pos += 12 + length
+        
+        self.assertTrue(has_ihdr, "PNG should have IHDR chunk")
+        self.assertTrue(has_physs, "PNG should have pHYs chunk with 144 dpi")
+        self.assertFalse(has_exif, "PNG should not have eXIf chunk")
 
 
 if __name__ == '__main__':
