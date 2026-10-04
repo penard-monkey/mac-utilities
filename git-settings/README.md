@@ -50,7 +50,8 @@ Uninstall preserves Git settings, SSH keys/config, and backups.
   then enter and apply its settings. Use a second rule with the same target to
   share an identity across directories. Choose Edit global defaults to return
   to the main file. Each operation has its own preview and backup.
-- **Effective identity:** choose a folder to read Git’s resolved commit name,
+- **Effective identity:** choose a folder (or enter an absolute or `~/` path, including
+  hidden folders) to read Git’s resolved commit name,
   email and signing settings with their scope and origin. Git evaluates the
   conditional rules and repository overrides. No config or repository writes
   are performed, and no credentials or helper commands are executed.

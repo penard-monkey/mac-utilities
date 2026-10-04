@@ -128,6 +128,13 @@ final class AppModel: ObservableObject {
     func previewRule(_ rule: IncludeRule? = nil, draft: IncludeDraft?) {
         perform { self.preview = try await self.gitService.previewRule(rule, draft: draft) }
     }
+    func checkIdentity(path: String) {
+        let folder: URL
+        if path.hasPrefix("~/") { folder = paths.home.appendingPathComponent(String(path.dropFirst(2))) }
+        else if path.hasPrefix("/") { folder = URL(fileURLWithPath: path) }
+        else { error = "Choose a folder or enter an absolute path or ~/path."; return }
+        checkIdentity(in: folder.standardizedFileURL)
+    }
     func checkIdentity(in folder: URL) {
         identity = nil
         perform { self.identity = try await self.gitService.effectiveIdentity(in: folder) }
@@ -437,10 +444,16 @@ struct IncludeRulesView: View {
 struct IdentityCheckView: View {
     @EnvironmentObject var model: AppModel
     @State private var choosingFolder = false
+    @State private var folderPath = ""
     var body: some View {
         Card(title: "Effective identity in a folder", icon: "folder.badge.person.crop") {
             Text("Choose a repository or folder to ask Git which identity it would use there, including matching rules and repository overrides. This reads config only.").font(.callout).foregroundStyle(.secondary)
-            Button("Choose folder…") { choosingFolder = true }.disabled(model.busy)
+            HStack {
+                TextField("Folder path, including hidden folders", text: $folderPath).textFieldStyle(.roundedBorder)
+                    .onSubmit { if !model.busy { model.checkIdentity(path: folderPath) } }
+                Button("Choose folder…") { choosingFolder = true }.disabled(model.busy)
+                Button("Check identity") { model.checkIdentity(path: folderPath) }.disabled(model.busy || folderPath.isEmpty)
+            }
             if let identity = model.identity {
                 Text(identity.folder.path).font(.caption.monospaced()).textSelection(.enabled)
                 if identity.values.isEmpty { Text("No identity or signing settings configured here.").foregroundStyle(.secondary) }
@@ -453,6 +466,7 @@ struct IdentityCheckView: View {
                 if !identity.values.contains(where: { $0.key == "user.email" }) { Text("user.email is not configured in this folder.").font(.callout).foregroundStyle(.secondary) }
             }
         }
+        .onChange(of: model.identity?.folder) { _, folder in if let folder { folderPath = folder.path } }
         .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder]) { result in
             switch result {
             case .success(let folder): model.checkIdentity(in: folder)
