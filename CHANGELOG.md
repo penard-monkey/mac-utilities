@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.0]
+
+- Git & SSH lists include rules and profile overrides, edits referenced profiles
+  inside the home folder, and previews adding, changing or removing rules.
+- Create a profile by adding its rule and applying settings to the new file;
+  removing a rule preserves the profile. Profile edits retain lock, symlink,
+  stale-preview and guarded-backup protections.
+- Check effective commit identity and signing settings for a chosen folder,
+  with the configuration origin and scope reported by Git.
+
 ## [1.0.0]
 
 - Install Mac Utilities with a checksum-verified `curl | bash` installer, with

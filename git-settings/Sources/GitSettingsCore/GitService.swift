@@ -79,8 +79,9 @@ public struct GitService: Sendable {
         if key == "core.excludesFile", !value.isEmpty, !value.hasPrefix("/") && !value.hasPrefix("~/") { throw AppError.message("Use an absolute path or a path beginning with ~/ for the ignore file.") }
     }
 
-    public func preview(changes: [String: String]) async throws -> ChangePreview {
-        let target = paths.gitConfig
+    public func preview(changes: [String: String], target requestedTarget: URL? = nil) async throws -> ChangePreview {
+        let target = (requestedTarget ?? paths.gitConfig).standardizedFileURL
+        let permission = target == paths.gitConfig.standardizedFileURL ? nil : try await authorization(for: target)
         let before = try FileState.read(target)
         let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("git-settings-config-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
@@ -99,6 +100,6 @@ public struct GitService: Sendable {
         }
         _ = try await runner.run(paths.git, ["config", "--file", staged.path, "--no-includes", "--list"], environment: paths.environment).checked()
         let after = try FileState.read(staged)
-        return ChangePreview(target: target, before: before, after: after, summary: "Git settings: " + changes.keys.sorted().joined(separator: ", "))
+        return ChangePreview(target: target, before: before, after: after, summary: "Git settings: " + changes.keys.sorted().joined(separator: ", "), authorization: permission)
     }
 }

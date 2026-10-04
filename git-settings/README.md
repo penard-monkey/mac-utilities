@@ -1,7 +1,7 @@
 # Git & SSH
 
 A native macOS 14+ app for **machine-level** Git defaults and SSH identities.
-It has no repository or project management UI.
+It also checks the effective identity in a chosen repository or folder.
 
 ## Install and remove
 
@@ -32,6 +32,28 @@ Uninstall preserves Git settings, SSH keys/config, and backups.
   global values and origins, and restore a guarded backup. The ignore file’s
   contents are not rewritten. Editors and aliases are command settings Git
   will execute later; the app does not execute them.
+- **Includes and profiles:** list every direct `include.path` and
+  `includeIf.<condition>.path` in the main Git config in file order, including
+  duplicates. Show each target, existence and supported values stored directly
+  in it. Add, change or remove unconditional, `gitdir:`, `gitdir/i:`, `onbranch:`
+  and `hasconfig:remote.*.url:` rules through a preview. Relative profile paths
+  resolve beside the main config; `~/` resolves under the current home.
+  Existing unknown conditions remain visible and can be removed or replaced.
+  Edits preserve other settings, comments and rule order. Removing a rule
+  never deletes its target. Nested includes remain intact but are not editable
+  unless also referenced directly from the main config.
+- **Profile editor:** choose Edit profile to edit identity, signing, editor,
+  initial branch, ignore path and aliases in that file. Only direct references
+  inside the home folder are editable; traversal outside home, symlinks
+  (including parent directories) and nonregular files are refused. To create a
+  profile, add/apply a rule pointing to a missing file, choose Create profile,
+  then enter and apply its settings. Use a second rule with the same target to
+  share an identity across directories. Choose Edit global defaults to return
+  to the main file. Each operation has its own preview and backup.
+- **Effective identity:** choose a folder to read Git’s resolved commit name,
+  email and signing settings with their scope and origin. Git evaluates the
+  conditional rules and repository overrides. No config or repository writes
+  are performed, and no credentials or helper commands are executed.
 - **SSH Keys:** inventory valid `.pub` files directly under `~/.ssh`, calculate
   SHA256 fingerprints with `ssh-keygen`, copy public keys, and load/unload
   individual identities in the existing agent. Invalid, unreadable, and
@@ -65,7 +87,7 @@ Commit identity labels commits; SSH/HTTPS authenticate connections. The app
 does not claim global settings are effective in every repository. Repository,
 system, environment, and conditional include settings can override global
 values. Global reads include unconditional includes; conditional repository
-rules are not evaluated against any repository. Signing still requires a
+rules are evaluated only when you choose a folder for an identity check. Signing still requires a
 working signing tool and key; this app does not install GPG or configure
 allowed signers. Credential helpers are not proof of login.
 
@@ -77,11 +99,17 @@ shell. Git previews call `git config --file` on a private copy for a known
 key allowlist (plus validated `alias.<name>`), then publish the reviewed
 global file under Git’s `.lock` convention. `~/.gitconfig` is the default
 write target; an existing XDG Git config is used when `.gitconfig` is absent,
-and `GIT_CONFIG_GLOBAL` is respected. Includes are read but never edited.
+and `GIT_CONFIG_GLOBAL` is respected. Profiles use the same staged Git edits;
+rule editing uses Git to parse and validate config while changing only the
+selected path assignment, adding section boundaries when its condition changes.
 Config symlinks and oversized/nonregular files are refused for mutation.
 
 Apply compares the original bytes again under a lock; stale previews refuse
-to overwrite. Timestamped before/after backups live in
+to overwrite. Profile apply holds both the main config and profile locks and
+also requires the main config to match the bytes that authorized the preview.
+Profile restore requires those original main-config bytes too: any later rule
+or main-config edit requires manual backup recovery. Timestamped before/after
+backups live in
 `~/.config/mac-utilities/git-settings/backups/` (directory 0700, files 0600).
 They contain full configuration and should be treated as sensitive local
 data. Restore compares all current bytes to the saved applied version and
@@ -100,6 +128,8 @@ swift test --package-path .
 
 The tests use per-test temporary directories, isolated HOME/XDG/global Git
 config and no system Git config or SSH agent. They verify include preservation,
+all four condition types, duplicate rule order/comment preservation, profile
+creation and authorization, effective folder identity and local overrides,
 source parsing, literal arguments, validation, stale preview/restore refusal,
 backups, lock/symlink refusal, host scope preservation, key publication and
 public inventory, and subprocess timeout/output limits. They never read
