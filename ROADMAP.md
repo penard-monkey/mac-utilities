@@ -5,20 +5,30 @@ the session summary that spawned it (see docs/sessions/). Groomed during the
 close-out ritual (global `/close-out` skill; this repo's settings in
 `.claude/close-out.md`).
 
-## Public distribution
+## Releases and updates
 
-- **Complete the deferred cut-over.** Merge manager/removal/archive PRs and the
-  active feature lanes, rebuild the manager, choose a license, rerun the fresh
-  full-history audit and recreate places. Verify hosted PR-ref/cached-view cleanup
-  before changing visibility, or choose a clean replacement if cleanup is unavailable.
-  The user has the detailed private report and kit in the local inbox.
-  ([session](docs/sessions/2026-10-03-publish-prep/summary.md))
-- **User checks the normal shield.** Plugin bytes/link location were verified;
-  the agent did not execute it because it uses administrator commands.
-  ([session](docs/sessions/2026-10-03-publish-prep/summary.md))
+- **Confirm an update from the manager window.** v1.0.1 was the first real
+  in-app update; confirm the Updates tab completes and relaunches.
+  ([session](docs/sessions/2026-10-04-releases-and-public-cutover/summary.md))
+- **Pick a stable signing identity.** Ad hoc signing may reset privacy
+  permissions after each update (matters for QR Reader's Screen Recording).
+  See `docs/releases/signing.md`.
+  ([session](docs/sessions/2026-10-04-releases-and-public-cutover/summary.md))
+
+## QR Reader
+
+- **Click-test, then PR.** Built locally with ten test codes; never pushed. Add
+  it to release verification once merged.
+
+## Transcribe
+
+- **Speaker labels.** Dropped for v1 to avoid torch; would need pyannote.
+  ([session](docs/sessions/2026-10-03-transcribe/summary.md))
 
 ## Git & SSH
 
+- **Try the folder picker by hand.** The effective-identity view was verified
+  with typed paths only. ([session](docs/sessions/2026-10-04-git-includes/summary.md))
 - **First-release limits.** Complex existing SSH host blocks open in an external
   editor instead of the form; the key inventory reads only `~/.ssh/*.pub`; keys held
   only by the agent show as a count; diagnostics run only when asked.
@@ -32,12 +42,11 @@ close-out ritual (global `/close-out` skill; this repo's settings in
 
 ## GIF Stickers
 
-- **Use the app by hand once.** It has never been launched interactively:
-  install with `gif-stickers/scripts/install.sh`, open a real GIF, frame it,
-  export. ([session](docs/sessions/2026-10-03-gif-stickers/summary.md))
-- **Find out whether WhatsApp Desktop accepts the WebP as a sticker** by drag
-  or paste. Today the documented route is a phone sticker pack.
-  ([session](docs/sessions/2026-10-03-gif-stickers/summary.md))
+- **First real send.** Send a sticker from the library to yourself, then
+  favourite it on the phone. ([session](docs/sessions/2026-10-04-gif-stickers-library/summary.md))
+- **A `kind=gif` path.** saywhat also accepts looping MP4 "GIFs"; the app only
+  sends animated WebP stickers today.
+  ([session](docs/sessions/2026-10-04-gif-stickers-library/summary.md))
 - **Noisy GIFs fall to quality 1.** The fallback lowers quality before frame
   rate; on busy GIFs dropping frames first may look better. Worth comparing
   on real inputs. ([session](docs/sessions/2026-10-03-gif-stickers/summary.md))
