@@ -12,7 +12,8 @@ final class CancellationFlag: @unchecked Sendable {
 }
 
 @MainActor final class EditorModel: ObservableObject {
-    let library = LibraryModel()
+    let library: LibraryModel
+    init(library: LibraryModel? = nil) { self.library = library ?? LibraryModel() }
     @Published var asset: AnimationAsset?
     @Published var framing = Framing()
     @Published var result: ExportResult?
@@ -74,23 +75,13 @@ final class CancellationFlag: @unchecked Sendable {
     }
     func save() {
         guard let result, let asset else { return }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [UTType(filenameExtension: "webp") ?? .data]
-        panel.nameFieldStringValue = asset.url.deletingPathExtension().lastPathComponent + "-sticker.webp"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard !busy else { return }
         do {
-            try result.data.write(to: url, options: .atomic)
-            do {
-                try library.store.save(result.data, name: url.lastPathComponent)
-                library.refresh()
-            } catch {
-                self.error = "The export was saved, but the library copy failed: " + error.localizedDescription
-                message = "Export saved; library copy failed."
-                return
-            }
-            copySticker(result.data, url: url)
-            NSWorkspace.shared.activateFileViewerSelecting([url])
-            message = "Saved to export and library, copied and revealed · " + result.summary
+            let url = try library.store.save(result.data, name: asset.url.lastPathComponent)
+            library.selectedURL = url
+            library.refresh()
+            message = "Added '\(url.deletingPathExtension().lastPathComponent)' to the library"
+            library.message = message
         } catch { self.error = error.localizedDescription }
     }
 }
@@ -132,7 +123,7 @@ final class CancellationFlag: @unchecked Sendable {
                 Button("Open GIF or Video…", action: model.openPanel).keyboardShortcut("o")
             }
             CommandGroup(replacing: .saveItem) {
-                Button("Export Sticker…", action: model.save).keyboardShortcut("s")
+                Button("Add to Library", action: model.save).keyboardShortcut("s")
                     .disabled(model.result == nil || model.busy)
             }
         }
@@ -313,7 +304,7 @@ struct EditorView: View {
                     if let result = model.result { sender.prepare(result.data) }
                 }.disabled(model.result == nil || model.busy || sender.busy || !sender.availability.ready)
                     .help(sender.availability.explanation)
-                Button("Export Sticker…", action: model.save).buttonStyle(.borderedProminent)
+                Button("Add to Library", action: model.save).buttonStyle(.borderedProminent)
                     .disabled(model.result == nil || model.busy)
             }
             Text(model.message).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)

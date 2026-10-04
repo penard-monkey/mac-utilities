@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0]
+
+- GIF Stickers: Add to Library (⌘S) saves the preview directly, with a safe
+  source filename and numbered collisions, and highlights it in the library.
+- Rename library stickers with validation and collision protection; the grid
+  now sorts by name.
+
 ## [1.1.1]
 
 - Tools: the menu bar glyph is drawn at 18 pt instead of twice that size.

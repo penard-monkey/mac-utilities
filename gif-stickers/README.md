@@ -31,14 +31,15 @@ It does not change your default GIF application or install a background job.
 4. Wait for the looping **512 × 512** preview. It plays the actual encoded WebP,
    with checkerboard behind transparent pixels. Changing the frame clears the old
    preview and prepares a new one after a short pause.
-5. **Export Sticker…** (⌘S) saves exactly that preview, also saves a copy in the
-   library, copies the WebP data and file URL to the clipboard, and reveals the
-   export in Finder. **Send to my WhatsApp** sends the preview through SayWhat
-   after confirmation, without requiring an export first.
+5. **Add to Library** (⌘S) saves exactly that preview directly to the library,
+   using the source filename without its extension. Unsafe filename characters
+   are replaced; duplicate names get ` 2`, ` 3`, and so on. The status line
+   confirms the name, and Library scrolls to and highlights the added sticker.
+   **Send to my WhatsApp** sends the preview through SayWhat after confirmation.
 
 The status line reports encoded size, actual duration and frame count, sampling
-rate, quality, and whether the input was trimmed. Export stays disabled until
-there is a current, successful preview. GIFs over 8192 pixels per side or 10,000
+rate, quality, and whether the input was trimmed. Add to Library stays disabled
+until there is a current, successful preview. GIFs over 8192 pixels per side or 10,000
 frames are rejected; corrupt files and missing encoder tools produce a clear error.
 
 ## Conversion
@@ -53,7 +54,7 @@ CoreGraphics crops/scales each sampled frame to 512×512.
 Fit uses a transparent canvas. ImageIO on the development Mac can read WebP but
 cannot write it, so `img2webp` encodes PNG frames in a private temporary directory
 which is removed after each conversion. There is no ffmpeg runtime dependency,
-upload during conversion. Exports persist as WebP files and library copies;
+upload during conversion. Added stickers persist as WebP files in the library;
 source GIFs and videos are not copied into the library.
 
 The exporter samples the first 10 seconds, starting at 20 fps. It tries lossy
@@ -77,8 +78,9 @@ strong first frame: WhatsApp rests on that frame after playback.
 ## Sticker library
 
 Choose **Library** at the top of the window for a grid of saved stickers. The
-previews play the actual WebP, including animation and transparency. Every
-successful export also saves a separate library copy with a unique filename.
+previews play the actual WebP, including animation and transparency. The grid
+sorts by name. **Add to Library** saves without a dialog, clipboard copy or
+Finder reveal.
 The default folder is `~/Pictures/GIF Stickers`. **Choose Folder…** changes it;
 the absolute path is stored as `library_folder` in
 `~/.config/mac-utilities/gif-stickers.json`. Changing folders shows the new
@@ -93,7 +95,13 @@ made outside the app.
 Each sticker offers **Send to my WhatsApp**, **Copy**, and a **More** menu with
 **Reveal in Finder** and **Delete…**. Deletion asks for confirmation and moves
 only that library file to Trash, where Finder can restore it. It leaves any
-separate export or original import intact.
+original import intact.
+
+Use **Rename…** on a sticker or in its context menu to edit the name; the
+`.webp` extension is kept. Return commits and Escape cancels. Names cannot be
+empty, start with a dot, contain path separators (`/`, `\`, `:`) or control
+characters, or exceed 200 characters (and must fit the filesystem byte limit).
+Existing names are refused, ignoring case, so rename never overwrites a file.
 
 ## Send through SayWhat
 
@@ -119,7 +127,7 @@ user action after release.
 
 ## Transfer without SayWhat
 
-The export is a compatible image file, not an installed sticker pack. Copying or
+The saved sticker is a compatible image file, not an installed sticker pack. Copying or
 dropping a `.webp` into a Desktop chat is **not a verified sticker-import path**;
 it may attach it as a file or image.
 
@@ -147,7 +155,9 @@ swift test
 Tests generate GIFs locally and independently inspect output using Homebrew
 `webpmux`, covering square canvas, animation, transparent fit padding, static size,
 10-second trimming, minimum frame duration, crop bounds, and invalid input.
-Library tests use temporary homes and a fake Trash. Signed-send tests use
+Library tests use temporary homes and a fake Trash, covering direct add, safe
+numbered filenames, rename validation, collision refusal, folder containment and
+name sorting. Signed-send tests use
 ephemeral loopback HTTP servers and temporary fake secrets, verifying exact
 multipart bytes and signature, key rotation, availability, confirmation
 cancellation, redirects and readable errors. They never read the real secret

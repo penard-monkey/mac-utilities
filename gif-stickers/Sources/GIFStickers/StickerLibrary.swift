@@ -40,12 +40,7 @@ struct LibrarySticker: Identifiable {
     let byteCount: Int
     let frameCount: Int
     var id: URL { url }
-    var name: String {
-        let stem = url.deletingPathExtension().lastPathComponent
-        if stem.count > 37, UUID(uuidString: String(stem.suffix(36))) != nil,
-           stem.dropLast(36).last == "-" { return String(stem.dropLast(37)) }
-        return stem
-    }
+    var name: String { url.deletingPathExtension().lastPathComponent }
 }
 
 struct LibraryContents {
@@ -62,6 +57,7 @@ struct StickerLibrary {
 
     init(home: URL = FileManager.default.homeDirectoryForCurrentUser,
          trash: @escaping (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) {
+        let home = home.resolvingSymlinksInPath()
         settingsURL = home.appendingPathComponent(".config/mac-utilities/gif-stickers.json")
         defaultFolder = home.appendingPathComponent("Pictures/GIF Stickers", isDirectory: true)
         self.trash = trash
@@ -79,7 +75,7 @@ struct StickerLibrary {
         guard path.hasPrefix("/") else {
             throw StickerError(message: "The library folder in settings must be an absolute path. Choose a folder in Library.")
         }
-        return URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+        return URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL.resolvingSymlinksInPath()
     }
     func chooseFolder(_ url: URL) throws {
         let destination = url.standardizedFileURL
@@ -94,11 +90,81 @@ struct StickerLibrary {
         _ = try StickerValidation.check(data)
         let directory = try folder()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        // Keep a useful name, with a fresh identifier so another export cannot overwrite it.
-        let stem = String(URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent.prefix(100))
-        let url = directory.appendingPathComponent("\(stem.isEmpty ? "sticker" : stem)-\(UUID().uuidString).webp")
-        try data.write(to: url, options: .atomic)
-        return url
+        let basename = (name as NSString).lastPathComponent
+        let stem = Self.safeStem((basename as NSString).deletingPathExtension)
+        var suffix = 1
+        while true {
+            let tail = suffix == 1 ? "" : " \(suffix)"
+            let candidate = Self.truncated(stem, characters: 200 - tail.count, bytes: 250 - tail.utf8.count) + tail + ".webp"
+            let url = directory.appendingPathComponent(candidate)
+            if try !containsName(candidate, in: directory) {
+                do {
+                    // Exclusive creation also protects against a file appearing after the listing.
+                    try data.write(to: url, options: .withoutOverwriting)
+                    return url.resolvingSymlinksInPath()
+                } catch {
+                    guard FileManager.default.fileExists(atPath: url.path) else { throw error }
+                }
+            }
+            suffix += 1
+        }
+    }
+    private static func truncated(_ value: String, characters: Int, bytes: Int) -> String {
+        var result = ""
+        for character in value.prefix(characters) {
+            guard result.utf8.count + String(character).utf8.count <= bytes else { break }
+            result.append(character)
+        }
+        return result
+    }
+    private static func safeStem(_ name: String) -> String {
+        let forbidden = CharacterSet.controlCharacters.union(CharacterSet(charactersIn: "/\\:"))
+        let cleaned = String(name.unicodeScalars.map { forbidden.contains($0) ? "_" : String($0) }.joined())
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let visible = String(cleaned.drop(while: { $0 == "." })).trimmingCharacters(in: .whitespacesAndNewlines)
+        let stem = truncated(visible, characters: 200, bytes: 250)
+        return stem.isEmpty ? "sticker" : stem
+    }
+    private func containsName(_ name: String, in directory: URL, excluding: URL? = nil) throws -> Bool {
+        try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil).contains {
+            $0.standardizedFileURL != excluding?.standardizedFileURL &&
+                $0.lastPathComponent.compare(name, options: [.caseInsensitive]) == .orderedSame
+        }
+    }
+    @discardableResult func rename(_ sticker: LibrarySticker, to name: String) throws -> URL {
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw StickerError(message: "Enter a sticker name.")
+        }
+        guard !name.contains("/"), !name.contains("\\"), !name.contains(":") else {
+            throw StickerError(message: "Sticker names cannot contain path separators (/, \\, or :).")
+        }
+        guard !name.hasPrefix(".") else {
+            throw StickerError(message: "Sticker names cannot start with a dot.")
+        }
+        guard name.rangeOfCharacter(from: .controlCharacters) == nil else {
+            throw StickerError(message: "Sticker names cannot contain control characters.")
+        }
+        guard name.count <= 200 else {
+            throw StickerError(message: "Sticker names must be at most 200 characters.")
+        }
+        guard name.utf8.count <= 250 else {
+            throw StickerError(message: "This name is too long for a filename. Use a shorter name.")
+        }
+        let directory = try folder().standardizedFileURL
+        guard sticker.url.standardizedFileURL.deletingLastPathComponent() == directory,
+              sticker.url.pathExtension.lowercased() == "webp" else {
+            throw StickerError(message: "That sticker is outside the current library. Refresh the library first.")
+        }
+        _ = try read(sticker.url) // Reject symlinks and invalid files before moving anything.
+        let destination = directory.appendingPathComponent(name + ".webp")
+        guard try !containsName(destination.lastPathComponent, in: directory, excluding: sticker.url) else {
+            throw StickerError(message: "A sticker named '\(name)' already exists. Choose another name.")
+        }
+        if destination.standardizedFileURL != sticker.url.standardizedFileURL {
+            // FileManager refuses to replace an existing destination.
+            try FileManager.default.moveItem(at: sticker.url, to: destination)
+        }
+        return destination
     }
     @discardableResult func importFile(_ url: URL) throws -> URL {
         let data = try read(url)
@@ -127,11 +193,14 @@ struct StickerLibrary {
                 let data = try read(url)
                 let metadata = try WebPMetadata(data: data)
                 let date = try url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate ?? .distantPast
-                stickers.append(LibrarySticker(url: url, modified: date, byteCount: data.count,
+                stickers.append(LibrarySticker(url: url.standardizedFileURL, modified: date, byteCount: data.count,
                     frameCount: max(1, metadata.delays.count)))
             } catch { skipped += 1 }
         }
-        return LibraryContents(folder: directory, stickers: stickers.sorted { $0.modified > $1.modified }, skipped: skipped)
+        return LibraryContents(folder: directory, stickers: stickers.sorted {
+            let order = $0.name.localizedStandardCompare($1.name)
+            return order == .orderedSame ? $0.url.lastPathComponent < $1.url.lastPathComponent : order == .orderedAscending
+        }, skipped: skipped)
     }
     func moveToTrash(_ sticker: LibrarySticker) throws {
         guard sticker.url.standardizedFileURL.deletingLastPathComponent() == (try folder()).standardizedFileURL,
