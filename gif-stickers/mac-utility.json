@@ -2,8 +2,8 @@
   "schema": 1,
   "id": "gif-stickers",
   "name": "GIF Stickers",
-  "version": "1.2.0",
-  "description": "Crop animated GIFs and export compact WebP stickers.",
+  "version": "1.3.0",
+  "description": "Turn GIFs, videos and still images into compact WebP stickers.",
   "presentation": "app",
   "app": {
     "name": "GIF Stickers.app",
@@ -22,6 +22,14 @@
       "paths": [
         "/opt/homebrew/bin/img2webp",
         "/usr/local/bin/img2webp"
+      ],
+      "help": "Install with brew install webp"
+    },
+    {
+      "name": "cwebp",
+      "paths": [
+        "/opt/homebrew/bin/cwebp",
+        "/usr/local/bin/cwebp"
       ],
       "help": "Install with brew install webp"
     }

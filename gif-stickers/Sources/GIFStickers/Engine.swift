@@ -2,20 +2,24 @@ import AppKit
 import AVFoundation
 import ImageIO
 import UniformTypeIdentifiers
+import Vision
+import CoreImage
 
 struct StickerError: LocalizedError {
     let message: String
     var errorDescription: String? { message }
 }
 
-/// One animation, read from a GIF or from a short video ("fake GIF" MP4/M4V/MOV).
-/// Immutable after init, so it is shared between the editor and the encoder queue.
+/// A GIF, short video, or upright still image.
+/// Source frames are immutable; the optional cutout cache is protected by a lock.
 final class AnimationAsset: @unchecked Sendable {
     static let maxVideoSide = 1024.0   // decoded video frames; a 512 sticker never needs more
     static let maxVideoFPS = 30.0      // the exporter samples at most 20 fps
     static let maxVideoSeconds = 10.0  // WhatsApp's animated sticker cap
     static let videoTypes: [UTType] = [.mpeg4Movie, .quickTimeMovie, UTType("com.apple.m4v-video")].compactMap { $0 }
-    static let openableTypes: [UTType] = [.gif] + videoTypes
+    static let imageTypes: [UTType] = [.png, .jpeg, .heic, .heif, .tiff, .webP]
+    static let openableTypes: [UTType] = [.gif] + videoTypes + imageTypes
+    static let maxImageSide = 2048
 
     let url: URL
     let size: CGSize
@@ -23,6 +27,9 @@ final class AnimationAsset: @unchecked Sendable {
     /// Length of the whole source. Longer than `duration` when a video was cut at 10 s.
     let sourceDuration: Double
     let isVideo: Bool
+    let isStillImage: Bool
+    private let cutoutLock = NSLock()
+    private var cachedCutout: Result<AnimationAsset, Error>?
     private let source: CGImageSource?
     private let frames: [CGImage]
     var duration: Double { delays.reduce(0, +) }
@@ -38,7 +45,7 @@ final class AnimationAsset: @unchecked Sendable {
             guard count > 0, count <= 10000, image.width <= 8192, image.height <= 8192 else {
                 throw StickerError(message: "This GIF is too large. Use up to 8192 pixels per side and 10,000 frames.")
             }
-            self.source = source; frames = []; isVideo = false
+            self.source = source; frames = []; isVideo = false; isStillImage = false
             size = CGSize(width: image.width, height: image.height)
             delays = (0..<count).map { index in
                 let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [String: Any]
@@ -50,10 +57,49 @@ final class AnimationAsset: @unchecked Sendable {
             sourceDuration = delays.reduce(0, +)
             return
         }
+        if let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+           let identifier = CGImageSourceGetType(source) as String?,
+           Self.imageTypes.contains(where: { $0.identifier == identifier }) {
+            if identifier == UTType.webP.identifier {
+                let metadata = try WebPMetadata(data: Data(contentsOf: url))
+                guard metadata.delays.isEmpty else {
+                    throw StickerError(message: "Animated WebP input is not supported. Choose a GIF, video or static image.")
+                }
+            }
+            let options: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: Self.maxImageSide,
+                kCGImageSourceShouldCacheImmediately: true
+            ]
+            guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+                throw StickerError(message: "Could not decode this image.")
+            }
+            self.source = nil; frames = [image]; delays = [0.1]; sourceDuration = 0.1
+            isVideo = false; isStillImage = true
+            size = CGSize(width: image.width, height: image.height)
+            return
+        }
         let video = try Self.decodeVideo(url)
-        source = nil; isVideo = true
+        source = nil; isVideo = true; isStillImage = false
         frames = video.frames; delays = video.delays; sourceDuration = video.sourceDuration
         size = CGSize(width: video.frames[0].width, height: video.frames[0].height)
+    }
+
+    private init(url: URL, image: CGImage) {
+        self.url = url; source = nil; frames = [image]; delays = [0.1]; sourceDuration = 0.1
+        isVideo = false; isStillImage = true
+        size = CGSize(width: image.width, height: image.height)
+    }
+
+    /// Called on the encoder queue. Cache successes and failures for this loaded image.
+    func cuttingOutSubject() throws -> AnimationAsset {
+        guard isStillImage else { return self }
+        cutoutLock.lock(); defer { cutoutLock.unlock() }
+        if let cachedCutout { return try cachedCutout.get() }
+        let result = Result { try AnimationAsset(url: url, image: SubjectCutout.removeBackground(from: frames[0])) }
+        cachedCutout = result
+        return try result.get()
     }
 
     func image(at index: Int) -> CGImage? {
@@ -73,7 +119,7 @@ final class AnimationAsset: @unchecked Sendable {
     /// Samples the first 10 s at the video's own frame rate (capped at 30 fps), upright and
     /// scaled to at most 1024 px. Audio is ignored.
     private static func decodeVideo(_ url: URL) throws -> (frames: [CGImage], delays: [Double], sourceDuration: Double) {
-        let unreadable = StickerError(message: "Choose a GIF or a short video (MP4, M4V or MOV).")
+        let unreadable = StickerError(message: "Choose a GIF, video or image (PNG, JPEG, HEIC, TIFF or static WebP).")
         let asset = AVURLAsset(url: url)
         guard let track = asset.tracks(withMediaType: .video).first else { throw unreadable }
         let seconds = CMTimeGetSeconds(asset.duration)
@@ -100,6 +146,32 @@ final class AnimationAsset: @unchecked Sendable {
             }
         }
         return (frames, Array(repeating: 1 / fps, count: frames.count), seconds)
+    }
+}
+
+enum SubjectCutout {
+    static func removeBackground(from image: CGImage) throws -> CGImage {
+        let handler = VNImageRequestHandler(cgImage: image, options: [:])
+        let request = VNGenerateForegroundInstanceMaskRequest()
+        try handler.perform([request])
+        guard let observation = request.results?.first, !observation.allInstances.isEmpty else {
+            throw StickerError(message: "No subject found. Kept the original image.")
+        }
+        let mask = try observation.generateScaledMaskForImage(forInstances: observation.allInstances, from: handler)
+        return try apply(mask: CIImage(cvPixelBuffer: mask), to: image)
+    }
+
+    /// Blend with transparent black so existing source alpha is retained too.
+    static func apply(mask: CIImage, to image: CGImage) throws -> CGImage {
+        let input = CIImage(cgImage: image)
+        let output = input.applyingFilter("CIBlendWithMask", parameters: [
+            kCIInputBackgroundImageKey: CIImage(color: .clear).cropped(to: input.extent),
+            kCIInputMaskImageKey: mask
+        ])
+        guard let result = CIContext().createCGImage(output, from: input.extent) else {
+            throw StickerError(message: "Could not apply the subject mask. Kept the original image.")
+        }
+        return result
     }
 }
 
@@ -155,8 +227,8 @@ struct ExportResult {
 }
 
 enum Encoder {
-    static func tool() throws -> String {
-        for path in ["/opt/homebrew/bin/img2webp", "/usr/local/bin/img2webp"] {
+    static func tool(named name: String = "img2webp") throws -> String {
+        for path in ["/opt/homebrew/bin/" + name, "/usr/local/bin/" + name] {
             if FileManager.default.isExecutableFile(atPath: path) { return path }
         }
         throw StickerError(message: "WebP encoder is missing. Install it with Homebrew: brew install webp")
@@ -170,13 +242,13 @@ enum Encoder {
             if cancelled() { throw CancellationError() }
         }
         try checkCancellation()
-        let executable = try tool()
+        let animated = asset.delays.count > 1
+        let executable = try tool(named: animated ? "img2webp" : "cwebp")
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("gif-stickers-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let totalMS = max(8, min(10000, Int((asset.duration*1000).rounded(.down))))
-        let animated = asset.delays.count > 1
-                for fps in animated ? [20, 15, 10, 6, 3, 1] : [1] {
+        for fps in animated ? [20, 15, 10, 6, 3, 1] : [1] {
             let count = animated ? max(2, Int(ceil(Double(totalMS)*Double(fps)/1000))) : 1
             let base = totalMS/count, extra = totalMS%count
             var paths: [(String, Int)] = []
@@ -201,7 +273,11 @@ enum Encoder {
                 try checkCancellation()
                 let output = directory.appendingPathComponent("sticker.webp")
                 var args = ["-loop", "0", "-min_size", "-lossy", "-q", String(quality), "-m", "4"]
-                for (path, delay) in paths { args += ["-d", String(delay), path] }
+                if animated {
+                    for (path, delay) in paths { args += ["-d", String(delay), path] }
+                } else {
+                    args = ["-q", String(quality), "-m", "4", paths[0].0]
+                }
                 args += ["-o", output.path]
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: executable); process.arguments = args
@@ -217,8 +293,9 @@ enum Encoder {
                 }
                 let data = try Data(contentsOf: output)
                 let metadata = try WebPMetadata(data: data)
-                let cap = metadata.delays.isEmpty ? 100000 : 500000
+                let cap = animated && !metadata.delays.isEmpty ? 500000 : 100000
                 guard metadata.width == 512, metadata.height == 512,
+                      animated || metadata.delays.isEmpty,
                       metadata.delays.allSatisfy({ $0 >= 8 }), metadata.delays.reduce(0, +) <= 10000 else {
                     throw StickerError(message: "Encoder produced a file outside the sticker specifications.")
                 }

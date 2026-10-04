@@ -1,9 +1,11 @@
 # GIF Stickers
 
-A native, single-window Mac app that turns GIFs into WhatsApp-compatible WebP
-sticker files. Requires macOS 14+, Xcode command-line tools to build, and the
-Homebrew WebP encoder at `/opt/homebrew/bin/img2webp` (Apple Silicon) or
-`/usr/local/bin/img2webp` (Intel). No third-party Swift packages.
+A native, single-window Mac app that turns GIFs, videos and still images into
+WhatsApp-compatible WebP sticker files. Requires macOS 14+, Xcode command-line
+tools to build, and the
+Homebrew WebP encoders (`img2webp` for animations and `cwebp` for stills) in
+`/opt/homebrew/bin` (Apple Silicon) or `/usr/local/bin` (Intel). No third-party
+Swift packages.
 
 ## Install
 
@@ -13,25 +15,32 @@ brew install webp
 open "$HOME/Applications/GIF Stickers.app"
 ```
 
-The installer builds the release executable, bundles GIF document associations,
-and signs it locally. An optional destination directory is its first argument.
-It does not change your default GIF application or install a background job.
+The installer builds the release executable, bundles GIF, video and image
+document associations, and signs it locally. An optional destination directory is its first argument.
+It does not change your default media application or install a background job.
 
 ## Use
 
-1. Click the empty **Frame your animation** box (or activate it with Return),
-   choose **File → Open GIF or Video…** (⌘O), or drop a file onto the window or
+1. Click the empty **Frame your sticker** box (or activate it with Return),
+   choose **File → Open GIF, Video or Image…** (⌘O), or drop a file onto the window or
    Dock icon. With a file loaded, use **Choose another file…** to replace it;
    clicking the canvas keeps working for cropping. Besides GIFs, it takes the
-   short looping videos many sites serve as "GIFs" (MP4, M4V or MOV).
+   short looping videos many sites serve as "GIFs" (MP4, M4V or MOV), and
+   PNG, JPEG, HEIC/HEIF, TIFF and static WebP images. Finder’s **Open With**
+   also supports these formats. Animated WebP input is rejected with a clear message.
 2. In **Crop**, drag the square to choose its position. Drag the bottom-right
    corner to resize it, or scroll over the animation to zoom around the square's center.
    The source keeps its aspect ratio. **Reset** centers the largest square.
 3. Choose **Fit with transparent padding** to include the whole frame.
-4. Wait for the looping **512 × 512** preview. It plays the actual encoded WebP,
+4. For a still image, optionally turn on **Cut out subject** (off by default).
+   Vision removes the background on this Mac and keeps all detected subjects.
+   The first attempt takes a moment; its result is cached while the image is
+   loaded, so toggling and re-framing reuse it. If no subject is found or
+   processing fails, the app explains the problem and keeps the original.
+5. Wait for the **512 × 512** preview. It plays the actual encoded WebP,
    with checkerboard behind transparent pixels. Changing the frame clears the old
    preview and prepares a new one after a short pause.
-5. **Add to Library** (⌘S) saves exactly that preview directly to the library,
+6. **Add to Library** (⌘S) saves exactly that preview directly to the library,
    using the source filename without its extension. Unsafe filename characters
    are replaced; duplicate names get ` 2`, ` 3`, and so on. The status line
    confirms the name, and Library scrolls to and highlights the added sticker.
@@ -48,14 +57,18 @@ ImageIO decodes GIFs. Videos are decoded with AVFoundation when the file is open
 the first 10 seconds at the video's own frame rate, capped at 30 fps, upright as
 recorded and scaled to at most 1024 pixels on the long side. Audio is ignored. A
 video longer than 10 seconds is cut at 10 seconds and the status line says so.
-From there both kinds go through the same steps.
+Still images are decoded by ImageIO with EXIF orientation applied and capped
+at 2048 pixels on the long side. PNG and other supported source transparency
+is preserved. Optional subject lifting uses macOS 14+ Vision locally, before
+framing, with no upload. All inputs then use the same framing and encoder.
 
 CoreGraphics crops/scales each sampled frame to 512×512.
 Fit uses a transparent canvas. ImageIO on the development Mac can read WebP but
-cannot write it, so `img2webp` encodes PNG frames in a private temporary directory
-which is removed after each conversion. There is no ffmpeg runtime dependency,
-upload during conversion. Added stickers persist as WebP files in the library;
-source GIFs and videos are not copied into the library.
+cannot write it, so `img2webp` (animations) or `cwebp` (static stickers) encodes
+PNG frames in a private temporary directory which is removed after each
+conversion. Conversion requires no ffmpeg and performs no upload. Added stickers
+persist as WebP files in the library;
+source GIFs, videos and images are not copied into the library.
 
 The exporter samples the first 10 seconds, starting at 20 fps. It tries lossy
 quality 90, 75, 55, 35, 15, then 1 before reducing the sampling rate to 15, 10, 6,
@@ -64,8 +77,9 @@ frame durations sum to the duration cap; no frame lasts less than 8 ms. Identica
 frames may be merged by the encoder. The resulting container is checked for
 canvas dimensions and animation timing, and its actual byte count must meet the
 applicable cap. If none of the attempts fits, export fails instead of saving an
-oversized sticker. A one-frame GIF, or an animation that collapses to one image,
-uses the static cap. GIFs slower than 20 fps may be resampled; these rates describe
+oversized sticker. A still image, a one-frame GIF, or an animation that collapses
+to one image uses the static cap. Still images try only the quality settings, with no frame-rate
+reduction. GIFs slower than 20 fps may be resampled; these rates describe
 sampling rather than distinct source frames. Changing the framing cancels obsolete
 work between frames/encoding attempts; an in-progress encoder invocation finishes.
 

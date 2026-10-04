@@ -15,10 +15,12 @@ final class CancellationFlag: @unchecked Sendable {
     let library: LibraryModel
     init(library: LibraryModel? = nil) { self.library = library ?? LibraryModel() }
     @Published var asset: AnimationAsset?
+    @Published var displayedAsset: AnimationAsset?
+    @Published var cutOutSubject = false
     @Published var framing = Framing()
     @Published var result: ExportResult?
     @Published var busy = false
-    @Published var message = "Open a GIF or a looping video to begin."
+    @Published var message = "Open a GIF, video or image to begin."
     @Published var error: String?
     private var pending: Task<Void, Never>?
     private var revision = 0
@@ -40,13 +42,15 @@ final class CancellationFlag: @unchecked Sendable {
                 switch loaded {
                 case .success(let asset):
                     self.asset = asset
+                    self.displayedAsset = asset
+                    self.cutOutSubject = false
                     self.framing = .centered(asset.size)
                     self.error = nil
                     self.update()
                 case .failure(let error):
                     self.busy = false
                     self.error = error.localizedDescription
-                    self.message = self.asset == nil ? "Open a GIF or a looping video to begin." : "Kept the previous file."
+                    self.message = self.asset == nil ? "Open a GIF, video or image to begin." : "Kept the previous file."
                 }
             }
         }
@@ -57,14 +61,27 @@ final class CancellationFlag: @unchecked Sendable {
         guard let asset else { return }
         busy = true; message = "Preparing sticker preview…"
         let frame = framing, version = revision
+        let cutOut = cutOutSubject
         let cancellation = cancellation
         pending = Task {
             do { try await Task.sleep(nanoseconds: 350_000_000) } catch { return }
             queue.async {
-                let output = Result { try Encoder.export(asset: asset, framing: frame, cancelled: { cancellation.cancelled }) }
+                var effectiveAsset = asset
+                var cutoutError: String?
+                if cutOut {
+                    do { effectiveAsset = try asset.cuttingOutSubject() }
+                    catch { cutoutError = error.localizedDescription }
+                }
+                let preparedAsset = effectiveAsset, failure = cutoutError
+                let output = Result { try Encoder.export(asset: preparedAsset, framing: frame, cancelled: { cancellation.cancelled }) }
                 Task { @MainActor in
                     guard version == self.revision else { return }
                     self.busy = false
+                    self.displayedAsset = preparedAsset
+                    if let failure {
+                        self.cutOutSubject = false
+                        self.error = failure
+                    }
                     switch output {
                     case .success(let result): self.result = result; self.message = result.summary
                     case .failure(let error): self.error = error.localizedDescription; self.message = "Preview failed."
@@ -120,7 +137,7 @@ final class CancellationFlag: @unchecked Sendable {
         }.defaultSize(width: 1130, height: 850)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Open GIF or Video…", action: model.openPanel).keyboardShortcut("o")
+                Button("Open GIF, Video or Image…", action: model.openPanel).keyboardShortcut("o")
             }
             CommandGroup(replacing: .saveItem) {
                 Button("Add to Library", action: model.save).keyboardShortcut("s")
@@ -249,7 +266,7 @@ struct EditorView: View {
             HStack {
                 VStack(alignment: .leading) {
                     Text("GIF Stickers").font(.largeTitle.bold())
-                    Text(model.asset?.url.lastPathComponent ?? "Turn an animation into a WhatsApp sticker.").foregroundStyle(.secondary)
+                    Text(model.asset?.url.lastPathComponent ?? "Turn a GIF, video or image into a WhatsApp sticker.").foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("Open…", action: model.openPanel)
@@ -257,7 +274,7 @@ struct EditorView: View {
             HStack(alignment: .top, spacing: 28) {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
-                        Text("Frame your animation").font(.headline)
+                        Text("Frame your sticker").font(.headline)
                         Spacer()
                         if model.asset != nil {
                             Button("Choose another file…", action: model.openPanel).controlSize(.small)
@@ -265,18 +282,18 @@ struct EditorView: View {
                     }
                     ZStack {
                         RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.06))
-                        if let asset = model.asset {
+                        if let asset = model.displayedAsset {
                             GIFCanvas(asset: asset, framing: $model.framing).padding(14)
                         } else {
                             Button(action: model.openPanel) {
-                                Text("Click or drop a GIF or looping video here\n(MP4, M4V, MOV)")
+                                Text("Click or drop a GIF, video or image here\n(PNG, JPEG, HEIC, TIFF, WebP, MP4, M4V, MOV)")
                                     .multilineTextAlignment(.center).foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                                     .contentShape(Rectangle())
                             }.buttonStyle(.plain)
                                 .keyboardShortcut(.defaultAction)
-                                .accessibilityLabel("Open GIF or video")
-                                .accessibilityHint("Choose a GIF, MP4, M4V or MOV file to frame.")
+                                .accessibilityLabel("Open GIF, video or image")
+                                .accessibilityHint("Choose a GIF, video or still image to frame.")
                         }
                     }.frame(minWidth: 360, maxWidth: .infinity).frame(height: 512)
                     Text("Drag the square to pan · drag its corner or scroll to zoom").font(.caption).foregroundStyle(.secondary)
@@ -299,6 +316,11 @@ struct EditorView: View {
                 if let asset = model.asset {
                     Button("Reset") { model.framing = .centered(asset.size) }
                 }
+                if model.asset?.isStillImage == true {
+                    Toggle("Cut out subject", isOn: $model.cutOutSubject)
+                        .toggleStyle(.checkbox)
+                        .help("Remove the background on this Mac, keeping all detected subjects.")
+                }
                 Spacer()
                 Button("Send to my WhatsApp") {
                     if let result = model.result { sender.prepare(result.data) }
@@ -309,6 +331,7 @@ struct EditorView: View {
             }
             Text(model.message).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
         }.padding(24).frame(minWidth: 1060, minHeight: 700)
+            .onChange(of: model.cutOutSubject) { _, _ in model.update() }
             .onChange(of: model.framing) { _, _ in model.update() }
             .onDrop(of: [.fileURL], isTargeted: nil) { providers in
                 guard let provider = providers.first else { return false }
