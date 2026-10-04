@@ -17,6 +17,7 @@ APP="$STAGE/Mac Utilities.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/Backend" "$APP/Contents/Resources/Catalog"
 cp "$BIN/MacUtilities" "$APP/Contents/MacOS/MacUtilities"
 cp "$ROOT/Info.plist" "$APP/Contents/Info.plist"
+cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 cp "$ROOT/backend/lifecycle.py" "$ROOT/backend/package_app.py" "$APP/Contents/Resources/Backend/"
 cp "$REPO/scripts/release/install.py" "$APP/Contents/Resources/Backend/release.py"
 /usr/bin/python3 -B - "$REPO" "$APP/Contents/Resources/release-config.json" <<'PYCONFIG'

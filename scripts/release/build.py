@@ -105,9 +105,8 @@ def build(repo, output, scratch, disable_sandbox=False):
                 shutil.copy2(repo/'scripts/release/install.py', resources/'Backend/release.py')
                 shutil.copytree(catalog, resources/'Catalog')
                 (resources/'release-config.json').write_text(json.dumps({'repo':slug, 'version':version})+'\n')
-            if (source/'scripts/make-icon.swift').is_file():
-                run('/usr/bin/swift', source/'scripts/make-icon.swift', stage/'AppIcon.iconset')
-                run('/usr/bin/iconutil', '-c', 'icns', stage/'AppIcon.iconset', '-o', resources/'AppIcon.icns')
+            if (source/'Resources/AppIcon.icns').is_file():
+                shutil.copy2(source/'Resources/AppIcon.icns', resources/'AppIcon.icns')
             # Future app resources must be declared/copied here before signing; fail verification if absent.
             archs = subprocess.check_output(['/usr/bin/lipo', '-archs', str(macos/executable)], text=True).split()
             if set(archs) != {'arm64', 'x86_64'}:
