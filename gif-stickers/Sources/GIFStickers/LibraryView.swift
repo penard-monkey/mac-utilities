@@ -6,7 +6,8 @@ import UniformTypeIdentifiers
     let store: StickerLibrary
     @Published private(set) var stickers: [LibrarySticker] = []
     @Published private(set) var folder: URL
-    @Published var message = "Exports are saved here. Drop 512 × 512 WebP stickers to import them."
+    @Published var message = "Added stickers are saved here. Drop 512 × 512 WebP stickers to import them."
+    @Published var selectedURL: URL?
     @Published var error: String?
     @Published private(set) var loading = false
     private let queue = DispatchQueue(label: "gif-stickers.library", qos: .userInitiated)
@@ -63,6 +64,12 @@ import UniformTypeIdentifiers
             }
         }
     }
+    func rename(_ sticker: LibrarySticker, to name: String) throws {
+        let url = try store.rename(sticker, to: name)
+        selectedURL = url
+        message = "Renamed sticker to '\(name)'."
+        refresh()
+    }
     func copy(_ sticker: LibrarySticker) {
         do {
             let data = try store.read(sticker.url)
@@ -93,6 +100,7 @@ struct LibraryView: View {
     @ObservedObject var sender: SendModel
     @State private var deleting: LibrarySticker?
     @State private var targeted = false
+    @State private var renaming: LibrarySticker?
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
@@ -103,34 +111,52 @@ struct LibraryView: View {
                 Button("Choose Folder…", action: model.chooseFolder)
             }
             Text(model.folder.path).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-            ScrollView {
-                if model.stickers.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "square.grid.2x2").font(.system(size: 40)).foregroundStyle(.secondary)
-                        Text("Your saved stickers appear here").font(.headline)
-                        Text("Export a sticker, or drop existing 512 × 512 WebP files here.").foregroundStyle(.secondary)
-                    }.frame(maxWidth: .infinity, minHeight: 320)
-                } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 16)], spacing: 16) {
-                        ForEach(model.stickers) { sticker in
-                            LibraryTile(sticker: sticker, model: model, sender: sender, delete: { deleting = sticker })
+            ScrollViewReader { proxy in
+                ScrollView {
+                    if model.stickers.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "square.grid.2x2").font(.system(size: 40)).foregroundStyle(.secondary)
+                            Text("Your saved stickers appear here").font(.headline)
+                            Text("Add a sticker from the editor, or drop existing 512 × 512 WebP files here.").foregroundStyle(.secondary)
+                        }.frame(maxWidth: .infinity, minHeight: 320)
+                    } else {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 16)], spacing: 16) {
+                            ForEach(model.stickers) { sticker in
+                                LibraryTile(sticker: sticker, model: model, sender: sender,
+                                    delete: { deleting = sticker }, rename: { renaming = sticker })
+                                    .id(sticker.url)
+                            }
+                        }.padding(4)
+                    }
+                }.background(targeted ? Color.accentColor.opacity(0.1) : .clear)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(targeted ? Color.accentColor : .clear, lineWidth: 2))
+                    .onDrop(of: [.fileURL], isTargeted: $targeted) { providers in
+                        guard !providers.isEmpty else { return false }
+                        for provider in providers {
+                            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                                if let url { Task { @MainActor in model.importFiles([url]) } }
+                            }
                         }
-                    }.padding(4)
-                }
-            }.background(targeted ? Color.accentColor.opacity(0.1) : .clear)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(targeted ? Color.accentColor : .clear, lineWidth: 2))
-                .onDrop(of: [.fileURL], isTargeted: $targeted) { providers in
-                    guard !providers.isEmpty else { return false }
-                    for provider in providers {
-                        _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                            if let url { Task { @MainActor in model.importFiles([url]) } }
+                        return true
+                    }
+                    .onChange(of: model.stickers.map(\.url)) { _, urls in
+                        if let selected = model.selectedURL, urls.contains(selected) {
+                            proxy.scrollTo(selected, anchor: .center)
                         }
                     }
-                    return true
-                }
+                    .onAppear {
+                        if let selected = model.selectedURL { proxy.scrollTo(selected, anchor: .center) }
+                    }
+                    .onChange(of: model.selectedURL) { _, selected in
+                        if let selected { proxy.scrollTo(selected, anchor: .center) }
+                    }
+            }
             Text(model.message).font(.callout).foregroundStyle(.secondary)
         }.padding(24).frame(minWidth: 1060, minHeight: 700)
             .onAppear { model.refresh() }
+            .sheet(item: $renaming) { sticker in
+                RenameStickerSheet(sticker: sticker, model: model)
+            }
             .alert("Move sticker to Trash?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
                 Button("Cancel", role: .cancel) { deleting = nil }
                 Button("Move to Trash", role: .destructive) {
@@ -149,6 +175,7 @@ private struct LibraryTile: View {
     @ObservedObject var model: LibraryModel
     @ObservedObject var sender: SendModel
     var delete: () -> Void
+    var rename: () -> Void
     @State private var data: Data?
     @State private var failed = false
     var body: some View {
@@ -169,17 +196,63 @@ private struct LibraryTile: View {
                 .help(sender.availability.explanation)
             HStack {
                 Button("Copy") { model.copy(sticker) }
+                Button("Rename…", action: rename)
                 Menu("More") {
                     Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([sticker.url]) }
                     Button("Delete…", role: .destructive, action: delete)
                 }
             }
         }.padding(12).background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12)
+                .stroke(model.selectedURL == sticker.url ? Color.accentColor : .clear, lineWidth: 2))
+            .onTapGesture { model.selectedURL = sticker.url }
+            .contextMenu {
+                Button("Rename…", action: rename)
+                Button("Copy") { model.copy(sticker) }
+                Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([sticker.url]) }
+                Button("Delete…", role: .destructive, action: delete)
+            }
             .task(id: sticker.modified) {
                 let store = model.store, url = sticker.url
                 let output = await Task.detached { try? store.read(url) }.value
                 guard !Task.isCancelled else { return }
                 data = output; failed = output == nil
             }
+    }
+}
+
+private struct RenameStickerSheet: View {
+    let sticker: LibrarySticker
+    @ObservedObject var model: LibraryModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var error: String?
+    @FocusState private var focused: Bool
+
+    init(sticker: LibrarySticker, model: LibraryModel) {
+        self.sticker = sticker
+        self.model = model
+        _name = State(initialValue: sticker.name)
+    }
+    private func commit() {
+        do {
+            try model.rename(sticker, to: name)
+            dismiss()
+        } catch { self.error = error.localizedDescription }
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Rename sticker").font(.headline)
+            HStack {
+                TextField("Sticker name", text: $name).focused($focused).onSubmit(commit)
+                Text(".webp").foregroundStyle(.secondary)
+            }
+            if let error { Text(error).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Rename", action: commit).keyboardShortcut(.defaultAction)
+            }
+        }.padding(24).frame(width: 420).onAppear { focused = true }
     }
 }

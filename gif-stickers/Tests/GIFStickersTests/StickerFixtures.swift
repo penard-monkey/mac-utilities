@@ -9,7 +9,7 @@ enum StickerFixtures {
     static func temporaryHome() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("gif-stickers-test-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        return url.resolvingSymlinksInPath()
     }
     private static func make(frames: Int) throws -> Data {
         let directory = try temporaryHome()

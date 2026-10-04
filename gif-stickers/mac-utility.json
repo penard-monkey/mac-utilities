@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "gif-stickers",
   "name": "GIF Stickers",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Crop animated GIFs and export compact WebP stickers.",
   "presentation": "app",
   "app": {

@@ -17,7 +17,7 @@ final class StickerLibraryTests: XCTestCase {
         XCTAssertTrue(model.error?.contains("1 file(s) could not be imported") == true)
         XCTAssertTrue(FileManager.default.fileExists(atPath: good.path))
     }
-    func testExportsAndImportsPreserveBytesWithoutOverwriting() throws {
+    func testAddsAndImportsPreserveBytesWithoutOverwriting() throws {
         let home = try StickerFixtures.temporaryHome()
         defer { try? FileManager.default.removeItem(at: home) }
         let library = StickerLibrary(home: home)
@@ -35,6 +35,131 @@ final class StickerLibraryTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: imported), data)
         XCTAssertEqual(try Data(contentsOf: source), data, "Import must keep the original")
         XCTAssertEqual(try library.contents().stickers.count, 3)
+    }
+    func testDefaultNamesAreSafeAndUseCaseInsensitiveNumberedCollisions() throws {
+        let home = try StickerFixtures.temporaryHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let library = StickerLibrary(home: home), data = try StickerFixtures.still.get()
+        XCTAssertEqual(try library.save(data, name: "Example.gif").lastPathComponent, "Example.webp")
+        XCTAssertEqual(try library.save(data, name: "example.mov").lastPathComponent, "example 2.webp")
+        XCTAssertEqual(try library.save(data, name: "example.mp4").lastPathComponent, "example 3.webp")
+        XCTAssertEqual(try library.save(data, name: ".hidden\\bad:line\n.gif").lastPathComponent, "hidden_bad_line_.webp")
+        XCTAssertEqual(try library.save(data, name: ".gif").lastPathComponent, "gif.webp")
+        XCTAssertEqual(try library.save(data, name: "").lastPathComponent, "sticker.webp")
+        let longName = String(repeating: "a", count: 250) + ".gif"
+        let first = try library.save(data, name: longName), second = try library.save(data, name: longName)
+        XCTAssertEqual(first.deletingPathExtension().lastPathComponent.count, 200)
+        XCTAssertEqual(second.deletingPathExtension().lastPathComponent.count, 200)
+        XCTAssertTrue(second.lastPathComponent.hasSuffix(" 2.webp"))
+        let unicode = try library.save(data, name: String(repeating: "🐱", count: 200) + ".gif")
+        XCTAssertLessThanOrEqual(unicode.lastPathComponent.utf8.count, 255)
+        XCTAssertEqual(try Data(contentsOf: first), data)
+    }
+    func testRenamePreservesBytesExtensionAndSortsByName() throws {
+        let home = try StickerFixtures.temporaryHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let library = StickerLibrary(home: home), data = try StickerFixtures.animated.get()
+        let original = try library.save(data, name: "Zebra.gif")
+        _ = try library.save(data, name: "Middle.gif")
+        let sticker = try XCTUnwrap(library.contents().stickers.first { $0.url == original })
+        let renamed = try library.rename(sticker, to: "Alpha")
+        XCTAssertEqual(renamed.lastPathComponent, "Alpha.webp")
+        XCTAssertEqual(renamed.deletingLastPathComponent(), try library.folder().standardizedFileURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: original.path))
+        XCTAssertEqual(try Data(contentsOf: renamed), data)
+        XCTAssertEqual(try library.contents().stickers.map(\.name), ["Alpha", "Middle"])
+        let current = try XCTUnwrap(library.contents().stickers.first)
+        XCTAssertEqual(try library.rename(current, to: "Alpha"), renamed)
+        let upper = try library.rename(current, to: "ALPHA")
+        XCTAssertEqual(upper.lastPathComponent, "ALPHA.webp")
+        let upperSticker = try XCTUnwrap(library.contents().stickers.first { $0.url == upper })
+        let uuidName = "named-12345678-1234-1234-1234-123456789012"
+        _ = try library.rename(upperSticker, to: uuidName)
+        XCTAssertTrue(try library.contents().stickers.contains { $0.name == uuidName })
+    }
+    func testRenameRejectsEveryInvalidNameAndNeverChangesFiles() throws {
+        let home = try StickerFixtures.temporaryHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let library = StickerLibrary(home: home), data = try StickerFixtures.still.get()
+        let original = try library.save(data, name: "original.gif")
+        let sticker = try XCTUnwrap(library.contents().stickers.first)
+        let invalid = ["", "   ", "../escaped", "sub/name", "sub\\name", "sub:name", ".hidden", ".", "..",
+                       "line\nname", "tab\tname", "null\0name", "delete\u{7f}name", String(repeating: "a", count: 201),
+                       String(repeating: "🐱", count: 200)]
+        for name in invalid {
+            XCTAssertThrowsError(try library.rename(sticker, to: name), name) { error in
+                XCTAssertFalse(error.localizedDescription.isEmpty)
+            }
+            XCTAssertEqual(try Data(contentsOf: original), data)
+            XCTAssertEqual(try library.contents().stickers.count, 1)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: home.appendingPathComponent("Pictures/escaped.webp").path))
+        XCTAssertEqual(try library.rename(sticker, to: String(repeating: "a", count: 200)).deletingPathExtension().lastPathComponent.count, 200)
+    }
+    func testRenameRefusesCaseInsensitiveCollisionIncludingNonStickerFiles() throws {
+        let home = try StickerFixtures.temporaryHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let library = StickerLibrary(home: home), data = try StickerFixtures.still.get()
+        let original = try library.save(data, name: "original.gif")
+        let sticker = try XCTUnwrap(library.contents().stickers.first)
+        let existing = try library.save(StickerFixtures.animated.get(), name: "Taken.gif")
+        let existingBytes = try Data(contentsOf: existing)
+        for name in ["Taken", "taken", "TAKEN"] {
+            XCTAssertThrowsError(try library.rename(sticker, to: name)) { error in
+                XCTAssertTrue(error.localizedDescription.contains("already exists"))
+            }
+        }
+        let invalid = (try library.folder()).appendingPathComponent("invalid.WEBP")
+        try Data("invalid".utf8).write(to: invalid)
+        XCTAssertThrowsError(try library.rename(sticker, to: "INVALID"))
+        XCTAssertEqual(try Data(contentsOf: original), data)
+        XCTAssertEqual(try Data(contentsOf: existing), existingBytes)
+    }
+    func testRenameRejectsOutsideStaleAndSymbolicLinkSources() throws {
+        let home = try StickerFixtures.temporaryHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let library = StickerLibrary(home: home), data = try StickerFixtures.still.get()
+        let original = try library.save(data, name: "original.gif")
+        let sticker = try XCTUnwrap(library.contents().stickers.first)
+        let outside = home.appendingPathComponent("outside.webp")
+        try data.write(to: outside)
+        let outsideSticker = LibrarySticker(url: outside, modified: Date(), byteCount: data.count, frameCount: 1)
+        XCTAssertThrowsError(try library.rename(outsideSticker, to: "escaped"))
+        let linked = original.deletingLastPathComponent().appendingPathComponent("link.webp")
+        try FileManager.default.createSymbolicLink(at: linked, withDestinationURL: outside)
+        XCTAssertThrowsError(try library.rename(LibrarySticker(url: linked, modified: Date(), byteCount: 0, frameCount: 1), to: "renamed"))
+        try library.chooseFolder(home.appendingPathComponent("new-library"))
+        XCTAssertThrowsError(try library.rename(sticker, to: "stale"))
+        XCTAssertEqual(try Data(contentsOf: outside), data)
+        XCTAssertEqual(try Data(contentsOf: original), data)
+        XCTAssertTrue(try library.contents().stickers.isEmpty)
+    }
+    @MainActor func testEditorAddsCurrentPreviewDirectlyAndSelectsIt() async throws {
+        let home = try StickerFixtures.temporaryHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let library = LibraryModel(store: StickerLibrary(home: home))
+        let editor = EditorModel(library: library)
+        editor.save()
+        XCTAssertTrue(try library.store.contents().stickers.isEmpty)
+        editor.asset = try AnimationAsset(url: EngineTests().fixture(home, frames: 2))
+        let data = try StickerFixtures.animated.get()
+        editor.result = ExportResult(data: data, duration: 0.2, fps: 20, quality: 90, frameCount: 2, trimmed: false)
+        editor.busy = true
+        editor.save()
+        XCTAssertTrue(try library.store.contents().stickers.isEmpty)
+        editor.busy = false
+        editor.save() // Returns without showing any panel; only the temporary library is written.
+        let url = try XCTUnwrap(library.selectedURL)
+        XCTAssertEqual(url.lastPathComponent, "sample.webp")
+        XCTAssertEqual(try Data(contentsOf: url), data)
+        XCTAssertEqual(editor.message, "Added 'sample' to the library")
+        XCTAssertEqual(library.message, editor.message)
+        let deadline = Date().addingTimeInterval(3)
+        while library.loading && Date() < deadline { await Task.yield() }
+        XCTAssertEqual(library.stickers.map(\.url), [url])
+        editor.save()
+        XCTAssertEqual(library.selectedURL?.lastPathComponent, "sample 2.webp")
+        while library.loading && Date() < deadline { await Task.yield() }
     }
     func testFolderSettingPersistsPreservesOtherKeysAndLeavesOldFiles() throws {
         let home = try StickerFixtures.temporaryHome()
