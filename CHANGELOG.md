@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1]
+
+- Transcribe: updating from the manager no longer fails with "Bootstrap
+  failed: 5: Input/output error". The engine installer now waits for launchd
+  to release the old job before loading the new one, and retries the load
+  briefly, so an update can no longer leave the engine stopped.
+
 ## [1.0.0]
 
 - Install Mac Utilities with a checksum-verified `curl | bash` installer, with

@@ -4,7 +4,7 @@
 # Offline proof: bash install.sh --artifacts DIR --home DIR --no-system-effects
 set -euo pipefail
 REPO="penard-monkey/mac-utilities"
-SCRIPT_VERSION="v1.0.0"
+SCRIPT_VERSION="v1.0.1"
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 fail() { echo "ERROR: $*" >&2; exit 1; }
 ARTIFACTS=""

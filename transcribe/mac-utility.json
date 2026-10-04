@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "transcribe",
   "name": "Transcribe",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Drop audio or video, get a transcript saved next to the file. Local mlx-whisper engine.",
   "presentation": "app",
   "app": { "name": "Transcribe.app", "bundle_id": "com.mac-utilities.transcribe" },
