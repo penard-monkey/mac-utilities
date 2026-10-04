@@ -13,7 +13,34 @@ Small, independent tools for this Mac, with a shared installer and Tools menu.
 
 ## Install
 
-Build the manager and install the shared Tools menu:
+Release tooling is being prepared; **no first release exists yet**. Keep current
+installs until the public cut-over and first release are approved. See
+[release verification and migration](docs/releases/) and the
+[signing recommendation](docs/releases/signing.md).
+
+Once a public release is published, install prebuilt apps without Swift:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/penard-monkey/mac-utilities/main/install.sh | bash
+# Pin a release and choose optional utilities:
+curl -fsSL https://raw.githubusercontent.com/penard-monkey/mac-utilities/v1.0.0/install.sh | \
+  MAC_UTILITIES_INSTALL_VERSION=v1.0.0 MAC_UTILITIES_INSTALL=gif-stickers,memory bash
+# From a downloaded installer:
+bash install.sh update --all
+bash install.sh uninstall memory
+bash install.sh uninstall manager
+```
+
+The release installer puts Mac Utilities and Tools in their standard locations,
+then installs named utilities (or offers a terminal choice). It requires every
+artifact's SHA-256 checksum. Quarantine is retained unless explicitly requested
+with `--strip-quarantine`. Receipt-owned checkout installs can be replaced in
+place while preserving settings, caches, Git config and SSH keys; unowned or
+modified installs are reported for review. Ad hoc builds may need fresh privacy
+grants after updates. The manager’s **Updates** tab checks and installs releases,
+then relaunches after updating itself. External sources update from their folders.
+
+For development, build the manager and Tools menu from your selected checkout:
 
 ```sh
 scripts/install.sh manager

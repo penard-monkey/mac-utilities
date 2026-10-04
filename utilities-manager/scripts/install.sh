@@ -17,7 +17,15 @@ APP="$STAGE/Mac Utilities.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/Backend" "$APP/Contents/Resources/Catalog"
 cp "$BIN/MacUtilities" "$APP/Contents/MacOS/MacUtilities"
 cp "$ROOT/Info.plist" "$APP/Contents/Info.plist"
-cp "$ROOT/backend/lifecycle.py" "$APP/Contents/Resources/Backend/"
+cp "$ROOT/backend/lifecycle.py" "$ROOT/backend/package_app.py" "$APP/Contents/Resources/Backend/"
+cp "$REPO/scripts/release/install.py" "$APP/Contents/Resources/Backend/release.py"
+/usr/bin/python3 -B - "$REPO" "$APP/Contents/Resources/release-config.json" <<'PYCONFIG'
+import json, pathlib, sys
+repo = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(repo/'scripts/release'))
+from version_gate import check, repo_slug
+pathlib.Path(sys.argv[2]).write_text(json.dumps({'repo':repo_slug(repo), 'version':check(repo)})+'\n')
+PYCONFIG
 /usr/bin/python3 - "$REPO" "$APP/Contents/Resources/Catalog" <<'PY'
 import importlib.util, json, pathlib, shutil, subprocess, sys
 repo, dest = map(pathlib.Path, sys.argv[1:])

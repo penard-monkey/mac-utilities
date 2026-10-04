@@ -10,6 +10,7 @@
   "install": { "command": ["scripts/install.sh", "{applications}"] },
   "uninstall": { "command": ["scripts/uninstall.sh"] },
   "privileged": false,
+  "release": { "engine_install": "scripts/install-engine.sh", "engine_arch": "arm64" },
   "dependencies": [
     {
       "name": "ffmpeg",

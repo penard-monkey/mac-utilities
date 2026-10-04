@@ -18,7 +18,7 @@ import uuid
 CATALOG = [
     ("tools", "Tools", "Open your installed utilities from the menu bar."),
     ("memory", "Memory", "Memory pressure and usage in the menu bar."),
-    ("travel-router", "Travel Router", "Travel networking; administrator setup in Terminal."),
+    ("transcribe", "Transcribe", "Local audio and video transcription."),
     ("gif-stickers", "GIF Stickers", "Create and export animated stickers."),
     ("git-settings", "Git & SSH", "Manage Git identity and SSH connections."),
 ]
@@ -393,7 +393,8 @@ class Manager:
                 if not hook.is_file() or not os.access(str(hook), os.X_OK):
                     raise LifecycleError("Install hook is missing or not executable: " + str(hook))
                 args = [str(hook)] + [v.replace("{applications}", str(stage_apps)) for v in command[1:]]
-                env = dict(os.environ, HOME=str(self.home), PATH="/usr/bin:/bin:/usr/sbin:/sbin")
+                env = dict(os.environ, HOME=str(self.home), PATH="/usr/bin:/bin:/usr/sbin:/sbin",
+                           MAC_UTILITIES_NO_SYSTEM_EFFECTS="0" if self.system_effects else "1")
                 result = subprocess.run(args, cwd=str(payload), env=env, stdout=subprocess.PIPE,
                                         stderr=subprocess.STDOUT, text=True)
                 if result.returncode:
@@ -410,6 +411,12 @@ class Manager:
                       "source": str(self.catalog_source(source)),
                       "payload": str(destination), "payload_digest": digest(payload),
                       "visible": previous["visible"] if previous else True}
+            release_path = self.catalog_source(source) / "release.json"
+            if release_path.is_file():
+                release = json.loads(release_path.read_text())
+                if release.get("schema") != 1 or not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", release.get("tag", "")):
+                    raise LifecycleError("Invalid release catalog metadata")
+                record["release"] = {"repo": release["repo"], "tag": release["tag"]}
             if legacy:
                 record["legacy_plugin_target"] = legacy
             elif previous and previous.get("legacy_plugin_target"):

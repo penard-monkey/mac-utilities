@@ -1,0 +1,52 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  artifacts:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version gate
+        env:
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          set --
+          if [[ -n "$RELEASE_TAG" ]]; then set -- --tag "$RELEASE_TAG"; fi
+          /usr/bin/python3 scripts/release/version_gate.py --repository "$GITHUB_REPOSITORY" "$@"
+      - name: All tests
+        run: /bin/bash scripts/release/test.sh
+      - name: Build universal apps and catalog
+        run: /usr/bin/python3 scripts/release/build.py --output "$RUNNER_TEMP/dist" --scratch "$RUNNER_TEMP/build"
+      - name: Prove installer against actual artifacts in an isolated home
+        env:
+          MAC_UTILITIES_INSTALL: memory,git-settings,gif-stickers,transcribe
+        run: |
+          /bin/bash install.sh --artifacts "$RUNNER_TEMP/dist" --home "$RUNNER_TEMP/proof-home" --no-system-effects
+          /bin/bash install.sh --artifacts "$RUNNER_TEMP/dist" --home "$RUNNER_TEMP/proof-home" --no-system-effects update --all
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-utilities-release
+          path: ${{ runner.temp }}/dist/*
+          if-no-files-found: error
+  publish:
+    # Dispatch proves artifacts only; it can never create a release or tag.
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: artifacts
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: mac-utilities-release
+          path: dist
+      - name: Publish existing approved tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" dist/*.zip dist/*.sha256 dist/checksums.txt dist/release.json dist/release-runtime.py --verify-tag --title "Mac Utilities $RELEASE_TAG" --notes-file dist/notes.md

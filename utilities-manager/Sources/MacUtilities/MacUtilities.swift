@@ -35,6 +35,7 @@ struct Utility: Decodable, Identifiable {
     var icon: String {
         switch id {
         case "memory": return "memorychip"
+        case "transcribe": return "waveform"
         case "travel-router": return "network"
         case "gif-stickers": return "photo.stack"
         case "git-settings": return "point.3.connected.trianglepath.dotted"
@@ -50,6 +51,26 @@ struct CatalogSource: Decodable, Identifiable {
 }
 struct Catalog: Decodable { let utilities: [Utility] }
 struct SourceCatalog: Decodable { let sources: [CatalogSource] }
+struct UtilityUpdate: Decodable, Identifiable {
+    let id: String
+    let name: String
+    let current: String?
+    let latest: String?
+    let available: Bool
+    let healthy: Bool
+    let external: Bool
+    let issue: String?
+}
+struct ReleaseStatus: Decodable {
+    let current: String?
+    let latest: String
+    let managerUpdate: Bool
+    let utilities: [UtilityUpdate]
+    enum CodingKeys: String, CodingKey {
+        case current, latest, utilities
+        case managerUpdate = "manager_update"
+    }
+}
 struct BackendFailure: LocalizedError {
     let message: String
     var errorDescription: String? { message }
@@ -63,22 +84,52 @@ final class ManagerModel: ObservableObject {
     @Published var busy = false
     @Published var message: String?
     @Published var error: String?
+    @Published var releaseStatus: ReleaseStatus?
+    @Published var updateError: String?
+    @Published var stripQuarantine = false
     private let backend: String
     private let home: String
     private let isolated: Bool
     private let settings: URL
+    private let releaseScript: String
+    private let releaseRepo: String
+    private let processEnvironment: [String: String]
+    let currentVersion: String
 
-    init() {
-        let environment = ProcessInfo.processInfo.environment
+    init(environment: [String: String] = ProcessInfo.processInfo.environment,
+         resources: URL? = Bundle.main.resourceURL, version: String? = nil) {
+        processEnvironment = environment
         home = environment["MAC_UTILITIES_HOME"] ?? FileManager.default.homeDirectoryForCurrentUser.path
         isolated = environment["MAC_UTILITIES_NO_SYSTEM_EFFECTS"] == "1"
+        releaseScript = resources?.appendingPathComponent("Backend/release.py").path ?? ""
+        let releaseConfig = resources?.appendingPathComponent("release-config.json")
+        let config = releaseConfig.flatMap { try? Data(contentsOf: $0) }
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: String]
+        releaseRepo = config?["repo"] ?? ""
+        currentVersion = version ?? Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
         settings = URL(fileURLWithPath: home).appendingPathComponent(".config/mac-utilities/utilities-manager.json")
         let saved = (try? Data(contentsOf: settings)).flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: String]
-        backend = Bundle.main.resourceURL?.appendingPathComponent("Backend/lifecycle.py").path
+        backend = resources?.appendingPathComponent("Backend/lifecycle.py").path
             ?? ""
         source = environment["MAC_UTILITIES_SOURCE"]
             ?? saved?["source"]
-            ?? Bundle.main.resourceURL?.appendingPathComponent("Catalog").path ?? ""
+            ?? resources?.appendingPathComponent("Catalog").path ?? ""
+    }
+
+    var releaseMode: Bool {
+        FileManager.default.fileExists(atPath: URL(fileURLWithPath: source).appendingPathComponent("release.json").path)
+    }
+
+    func releaseSource() {
+        let state = URL(fileURLWithPath: home).appendingPathComponent("Library/Application Support/mac-utilities/state/release.json")
+        let record = (try? Data(contentsOf: state)).flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+        if let catalog = record?["catalog"] as? String, FileManager.default.fileExists(atPath: catalog) {
+            source = catalog
+            saveSource()
+            Task { await refresh() }
+        } else {
+            bundledSource()
+        }
     }
 
     func chooseSource() {
@@ -145,14 +196,20 @@ final class ManagerModel: ObservableObject {
         arguments.append(action)
         if let id { arguments.append(id) }
         if let extra { arguments.append(extra) }
+        return try await runBackend(executable, arguments: arguments)
+    }
+
+    private func runBackend(_ executable: String, arguments: [String]) async throws -> Data {
         let commandArguments = arguments
+        let childEnvironment = processEnvironment
         return try await Task.detached(priority: .userInitiated) {
             guard FileManager.default.fileExists(atPath: executable) else {
                 throw BackendFailure(message: "The bundled installer is missing. Reinstall Mac Utilities.app.")
             }
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
-            process.arguments = commandArguments
+            process.arguments = ["-B"] + commandArguments
+            process.environment = childEnvironment
             let pipe = Pipe()
             process.standardOutput = pipe
             process.standardError = pipe
@@ -168,6 +225,59 @@ final class ManagerModel: ObservableObject {
         }.value
     }
 
+    private func releaseArguments() throws -> [String] {
+        guard !releaseRepo.isEmpty else {
+            throw BackendFailure(message: "The release configuration is missing. Reinstall the manager from a complete checkout or release.")
+        }
+        var args = [releaseScript, "--repo", releaseRepo, "--home", home, "--json"]
+        if isolated { args.append("--no-system-effects") }
+        if stripQuarantine { args.append("--strip-quarantine") }
+        return args
+    }
+
+    func checkUpdates() async {
+        guard !busy else { return }
+        busy = true
+        updateError = nil
+        defer { busy = false }
+        do {
+            let arguments = try releaseArguments() + ["--current-version", currentVersion, "--check"]
+            releaseStatus = try JSONDecoder().decode(ReleaseStatus.self, from: await runBackend(releaseScript, arguments: arguments))
+        } catch {
+            releaseStatus = nil
+            updateError = error.localizedDescription
+        }
+    }
+
+    func updateRelease(id: String? = nil) async {
+        guard !busy else { return }
+        busy = true
+        updateError = nil
+        defer { busy = false }
+        do {
+            let arguments = try releaseArguments() + ["update", id ?? "--all"]
+            let data = try await runBackend(releaseScript, arguments: arguments)
+            let result = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            message = result?["message"] as? String
+            let saved = (try? Data(contentsOf: settings)).flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+            if let catalog = saved?["source"] as? String { source = catalog }
+            try await loadCatalog()
+            releaseStatus = nil
+            if result?["relaunch"] as? Bool == true, !isolated {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+                process.arguments = ["-n", Bundle.main.bundleURL.path]
+                try process.run()
+                process.waitUntilExit()
+                guard process.terminationStatus == 0 else { throw BackendFailure(message: "The update installed, but relaunch failed. Reopen Mac Utilities.") }
+                NSApplication.shared.terminate(nil)
+            }
+        } catch {
+            updateError = error.localizedDescription
+            self.error = error.localizedDescription
+        }
+    }
+
     func refresh() async {
         guard !busy else { return }
         busy = true
@@ -178,6 +288,10 @@ final class ManagerModel: ObservableObject {
     }
 
     func perform(_ action: String, utility: Utility, extra: String? = nil) async {
+        if action == "update", releaseMode, utility.source == source {
+            await updateRelease(id: utility.id)
+            return
+        }
         guard !busy else { return }
         busy = true
         defer { busy = false }
@@ -251,7 +365,7 @@ struct UtilityRow: View {
                     }
                     Button("Update") { Task { await model.perform("update", utility: utility) } }
                         .disabled(!utility.available || !utility.healthy)
-                        .help("Reinstall from the selected source, retaining settings and menu visibility")
+                        .help(model.releaseMode && utility.source == model.source ? "Update from the latest verified release" : "Update from this folder, retaining settings and menu visibility")
                     if utility.privileged {
                         Button("System commands") { model.message = "Copy the setup or removal command below and run it in Terminal. Administrator access is required." }
                     } else {
@@ -308,9 +422,95 @@ struct UtilityRow: View {
     }
 }
 
+struct UpdatesView: View {
+    @ObservedObject var model: ManagerModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Updates").font(.largeTitle.bold())
+                        Text("Mac Utilities \(model.currentVersion)").foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if model.busy { ProgressView().controlSize(.small) }
+                    Button("Check for updates") { Task { await model.checkUpdates() } }.disabled(model.busy)
+                }
+                if let error = model.updateError {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange).textSelection(.enabled)
+                }
+                if let message = model.message {
+                    Text(message).font(.callout).textSelection(.enabled)
+                }
+                if let status = model.releaseStatus {
+                    GroupBox("Mac Utilities") {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Installed: \(status.current ?? model.currentVersion)")
+                                Text("Latest release: \(status.latest)").foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if status.managerUpdate {
+                                Button("Update manager & relaunch") { Task { await model.updateRelease(id: "manager") } }
+                                    .buttonStyle(.borderedProminent)
+                            } else { Label("Up to date", systemImage: "checkmark.circle").foregroundStyle(.green) }
+                        }.padding(10)
+                    }
+                    HStack {
+                        Text("Installed utilities").font(.title2.bold())
+                        Spacer()
+                        Button("Update all & relaunch") { Task { await model.updateRelease() } }
+                            .disabled(status.utilities.contains { !$0.healthy })
+                    }
+                    ForEach(status.utilities) { utility in
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(utility.name).font(.headline)
+                                Text("\(utility.current ?? "unknown") → \(utility.latest ?? "unavailable")")
+                                    .font(.callout).foregroundStyle(.secondary)
+                                Text(utility.external ? "Updates from its configured folder" : "Updates from the release catalog")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                if let issue = utility.issue { Text(issue).font(.caption).foregroundStyle(.orange) }
+                            }
+                            Spacer()
+                            Button("Update") {
+                                Task {
+                                    if utility.external, let installed = model.utilities.first(where: { $0.id == utility.id }) {
+                                        await model.perform("update", utility: installed)
+                                    } else { await model.updateRelease(id: utility.id) }
+                                }
+                            }.disabled(!utility.available || !utility.healthy)
+                        }.padding(14).background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
+                    }
+                } else if model.updateError == nil {
+                    Text("Check for the latest release to update the manager or installed utilities.").foregroundStyle(.secondary)
+                }
+                Toggle("Remove quarantine from verified unsigned app updates", isOn: $model.stripQuarantine)
+                    .font(.callout)
+                Text("Settings, SSH keys, Git configuration, caches and menu visibility are kept. Quit and reopen other running utility apps after updating them.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }.padding(24).disabled(model.busy)
+        }
+    }
+}
+
 struct ManagerView: View {
     @StateObject private var model = ManagerModel()
     var body: some View {
+        TabView {
+            utilitiesView.tabItem { Label("Utilities", systemImage: "square.grid.2x2") }
+            UpdatesView(model: model).tabItem { Label("Updates", systemImage: "arrow.down.circle") }
+        }
+        .frame(minWidth: 720, idealWidth: 820, minHeight: 620, idealHeight: 840)
+        .task { await model.refresh() }
+        .alert("Couldn’t complete the action", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
+            Button("OK") { model.error = nil }
+        } message: { Text(model.error ?? "") }
+    }
+
+    private var utilitiesView: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -342,9 +542,16 @@ struct ManagerView: View {
                 HStack {
                     Text("Catalog sources").font(.caption.bold())
                     Spacer()
-                    Button("Bundled source") { model.bundledSource() }.disabled(model.busy)
-                    Button("Choose folder…") { model.chooseSource() }.disabled(model.busy)
+                    Button("Release catalog") { model.releaseSource() }.disabled(model.busy)
                     Button("Add source…") { model.addSource() }.disabled(model.busy)
+                }
+                DisclosureGroup("Developer mode") {
+                    HStack {
+                        Text("Build utilities from a local checkout.").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Bundled source") { model.bundledSource() }.disabled(model.busy)
+                        Button("Choose checkout…") { model.chooseSource() }.disabled(model.busy)
+                    }.padding(.vertical, 6)
                 }
                 ForEach(model.sources) { source in
                     HStack {
@@ -361,11 +568,6 @@ struct ManagerView: View {
                 }
             }.padding(16)
         }
-        .frame(minWidth: 720, idealWidth: 820, minHeight: 620, idealHeight: 840)
-        .task { await model.refresh() }
-        .alert("Couldn’t complete the action", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
-            Button("OK") { model.error = nil }
-        } message: { Text(model.error ?? "") }
     }
 }
 

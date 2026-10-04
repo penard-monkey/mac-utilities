@@ -22,13 +22,28 @@ is available. The app continues working after the checkout is removed. A pre-exi
 manager bundle is left alone; move it aside before installing a managed copy.
 `utilities-manager/scripts/uninstall.sh [destination]` removes only the verified
 manager app and keeps installed tools and preferences.
-Choose a newer complete checkout in the window to update utilities; **Bundled
-source** returns to the shipped snapshot. Updates deliberately rebuild even
+Developer mode can select a newer complete checkout; **Bundled source** returns
+to the shipped snapshot. Updates deliberately rebuild even
 when a utility's version number has not changed.
 
 A missing tool source stays in the catalog with an actionable prompt. GIF
 Stickers' encoder dependency is reported rather than installed automatically.
-No updater downloads software or modifies Homebrew.
+The **Updates** tab checks the public release feed without an API token. It shows
+current/latest versions, downloads checksum-verified manager and catalog assets,
+updates installed utilities and relaunches the manager after replacing its bundle.
+The public cut-over/first release is still pending; before then, a missing feed is
+reported without changing installs. Extra catalog sources continue updating from
+their folders, including when the public feed is unavailable.
+
+Release catalog is the normal source. **Developer mode → Choose checkout…** keeps
+local builds available. Returning to **Release catalog** selects the latest
+installed release snapshot. An old checkout preference is replaced when migrating
+to a release; extra sources and all other preferences remain.
+
+Downloads retain quarantine. **Remove quarantine from verified unsigned app
+updates** is an explicit per-session opt-in. No updater changes Homebrew or creates
+certificates. See [release/migration verification](../docs/releases/) and
+[signing recommendation](../docs/releases/signing.md).
 
 ## Selective command line
 
