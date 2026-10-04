@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 import GitSettingsCore
 
 @main
@@ -53,6 +54,11 @@ final class AppModel: ObservableObject {
     var sshService: SSHService { SSHService(paths: paths) }
     var transactions: TransactionStore { TransactionStore(directory: paths.state.appendingPathComponent("backups")) }
     @Published var git: GitSnapshot?
+    @Published var includeRules: [IncludeRule] = []
+    @Published var profileTarget: URL?
+    @Published var editorReady = false
+    @Published var identity: EffectiveIdentity?
+    private var editorOriginal: [String: String] = [:]
     @Published var agent: AgentSnapshot?
     @Published var keys: [PublicKey] = []
     @Published var sshConfig = SSHConfigSnapshot.parse("")
@@ -81,9 +87,15 @@ final class AppModel: ObservableObject {
         // Each area reports a failure independently so a broken Git file doesn't hide SSH.
         var failures: [String] = []
         do {
+            includeRules = try await gitService.includeRules()
+            if let target = profileTarget, !includeRules.contains(where: { $0.target == target && $0.editIssue == nil }) { profileTarget = nil }
             let snapshot = try await gitService.snapshot()
-            git = snapshot; editable = snapshot.editable
-        } catch { git = nil; failures.append("Git: " + error.localizedDescription) }
+            git = snapshot
+            if let target = profileTarget { editorOriginal = try await gitService.profileValues(target) }
+            else { editorOriginal = snapshot.editable }
+            editable = editorOriginal
+            editorReady = true
+        } catch { git = nil; editorReady = false; failures.append("Git: " + error.localizedDescription) }
         do {
             let currentAgent = try await sshService.agent()
             agent = currentAgent
@@ -97,12 +109,35 @@ final class AppModel: ObservableObject {
         if !failures.isEmpty { throw AppError.message(failures.joined(separator: "\n\n")) }
     }
     func previewSettings() {
-        let changed = editable.filter { $0.value != (git?.editable[$0.key] ?? "") }
+        let changed = editable.filter { $0.value != (editorOriginal[$0.key] ?? "") }
         guard !changed.isEmpty else { notice = "No settings changed."; return }
-        perform { self.preview = try await self.gitService.preview(changes: changed) }
+        perform { self.preview = try await self.gitService.preview(changes: changed, target: self.profileTarget) }
     }
     func previewAlias(name: String, command: String) {
-        perform { self.preview = try await self.gitService.preview(changes: ["alias." + name: command]) }
+        perform { self.preview = try await self.gitService.preview(changes: ["alias." + name: command], target: self.profileTarget) }
+    }
+    func selectProfile(_ target: URL?) {
+        perform {
+            if let target { self.editorOriginal = try await self.gitService.profileValues(target) }
+            else { self.editorOriginal = try await self.gitService.snapshot().editable }
+            self.profileTarget = target
+            self.editable = self.editorOriginal
+            self.editorReady = true
+        }
+    }
+    func previewRule(_ rule: IncludeRule? = nil, draft: IncludeDraft?) {
+        perform { self.preview = try await self.gitService.previewRule(rule, draft: draft) }
+    }
+    func checkIdentity(path: String) {
+        let folder: URL
+        if path.hasPrefix("~/") { folder = paths.home.appendingPathComponent(String(path.dropFirst(2))) }
+        else if path.hasPrefix("/") { folder = URL(fileURLWithPath: path) }
+        else { error = "Choose a folder or enter an absolute path or ~/path."; return }
+        checkIdentity(in: folder.standardizedFileURL)
+    }
+    func checkIdentity(in folder: URL) {
+        identity = nil
+        perform { self.identity = try await self.gitService.effectiveIdentity(in: folder) }
     }
     func previewHost(_ draft: HostDraft) { perform { self.preview = try self.sshService.previewHost(draft) } }
     func apply(_ preview: ChangePreview) {
@@ -171,7 +206,7 @@ enum Pane: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .overview: return "Your machine’s commit settings and authentication tools."
-        case .settings: return "Edit global defaults with a preview and a backup."
+        case .settings: return "Manage Git defaults, included profiles and folder identity."
         case .keys: return "Public identities on this Mac and keys in the current agent."
         case .hosts: return "Inspect your SSH configuration and add a host safely."
         case .diagnostics: return "Test SSH authentication when you choose."
@@ -207,20 +242,25 @@ struct ContentView: View {
                     Button { model.refresh() } label: { Image(systemName: "arrow.clockwise") }.help("Refresh configuration and agent state").disabled(model.busy)
                 }.padding(26)
                 Divider()
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        if let notice = model.notice {
-                            HStack { Label(notice, systemImage: "checkmark.circle").foregroundStyle(.green); Spacer(); Button { model.notice = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain) }
-                                .font(.callout).padding(12).background(.green.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
-                        }
-                        switch selection ?? .overview {
-                        case .overview: OverviewView()
-                        case .settings: SettingsView()
-                        case .keys: KeysView()
-                        case .hosts: HostsView()
-                        case .diagnostics: DiagnosticsView()
-                        }
-                    }.padding(26).frame(maxWidth: 1100, alignment: .leading)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 20) {
+                            if let notice = model.notice {
+                                HStack { Label(notice, systemImage: "checkmark.circle").foregroundStyle(.green); Spacer(); Button { model.notice = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain) }
+                                    .font(.callout).padding(12).background(.green.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
+                            }
+                            switch selection ?? .overview {
+                            case .overview: OverviewView()
+                            case .settings: SettingsView()
+                            case .keys: KeysView()
+                            case .hosts: HostsView()
+                            case .diagnostics: DiagnosticsView()
+                            }
+                        }.padding(26).frame(maxWidth: 1100, alignment: .leading)
+                    }
+                    .onChange(of: model.profileTarget) { _, _ in
+                        withAnimation { proxy.scrollTo("profile-editor", anchor: .top) }
+                    }
                 }
                 if let refreshed = model.lastRefreshed {
                     Divider()
@@ -298,8 +338,15 @@ struct SettingsView: View {
     @State private var aliasCommand = ""
     @State private var restoring: BackupRecord?
     var body: some View {
-        Card(title: "Global defaults", icon: "slider.horizontal.3") {
-            Text(model.git?.target.path ?? model.paths.gitConfig.path).font(.caption.monospaced()).textSelection(.enabled)
+        IncludeRulesView()
+        IdentityCheckView()
+        Card(title: model.profileTarget == nil ? "Global defaults" : "Included profile", icon: "slider.horizontal.3") {
+            HStack {
+                Text(model.profileTarget?.path ?? model.paths.gitConfig.path).textSelection(.enabled)
+                Spacer()
+                if model.profileTarget != nil { Button("Edit global defaults") { model.selectProfile(nil) }.disabled(model.busy) }
+            }.font(.caption.monospaced())
+            Text(model.profileTarget == nil ? "Editing the main Git config." : "Editing this profile only. If it does not exist, Apply creates it.").font(.callout).foregroundStyle(.secondary)
             Text("Fields show values stored directly in this file. Empty removes a value from this file; included values may still apply.").font(.callout).foregroundStyle(.secondary)
             ForEach(GitField.all) { field in
                 HStack(alignment: .top, spacing: 16) {
@@ -311,10 +358,11 @@ struct SettingsView: View {
                 }
             }
             HStack {
-                Button("Preview changes") { model.previewSettings() }.buttonStyle(.borderedProminent).disabled(model.busy || model.git == nil)
-                Button("Open config in TextEdit") { model.editFile(model.paths.gitConfig) }
+                Button("Preview changes") { model.previewSettings() }.buttonStyle(.borderedProminent).disabled(model.busy || !model.editorReady)
+                Button("Open config in TextEdit") { model.editFile(model.paths.gitConfig) }.disabled(model.busy || model.profileTarget != nil)
             }
         }
+        .id("profile-editor")
         Card(title: "Global values and sources", icon: "doc.text.magnifyingglass") {
             if let values = model.git?.values, !values.isEmpty {
                 ForEach(Array(values.enumerated()), id: \.offset) { _, value in
@@ -325,10 +373,10 @@ struct SettingsView: View {
                 }
             } else { Text("No supported global settings found.").foregroundStyle(.secondary) }
         }
-        Card(title: "Git alias", icon: "text.badge.plus") {
-            Text("Add or replace a global alias. An empty command removes it. Git executes aliases beginning with ! as shell commands when you later invoke them.").font(.callout).foregroundStyle(.secondary)
+        Card(title: "Alias in selected profile", icon: "text.badge.plus") {
+            Text("Add or replace an alias in the selected file. An empty command removes it. Git executes aliases beginning with ! as shell commands when you later invoke them.").font(.callout).foregroundStyle(.secondary)
             HStack { TextField("Alias, e.g. st", text: $aliasName).frame(width: 150); TextField("Command, e.g. status --short", text: $aliasCommand) }.textFieldStyle(.roundedBorder)
-            Button("Preview alias") { model.previewAlias(name: aliasName, command: aliasCommand) }.disabled(model.busy || aliasName.isEmpty || model.git == nil)
+            Button("Preview alias") { model.previewAlias(name: aliasName, command: aliasCommand) }.disabled(model.busy || aliasName.isEmpty || !model.editorReady)
         }
         Card(title: "Config backups", icon: "clock.arrow.circlepath") {
             Text("Restore is allowed only while the file exactly matches the applied version. Later edits require manual recovery.").font(.callout).foregroundStyle(.secondary)
@@ -345,6 +393,86 @@ struct SettingsView: View {
         .confirmationDialog("Restore this backup?", isPresented: Binding(get: { restoring != nil }, set: { if !$0 { restoring = nil } }), titleVisibility: .visible) {
             if let backup = restoring { Button("Restore \(URL(fileURLWithPath: backup.path).lastPathComponent)") { model.restore(backup); restoring = nil } }
         } message: { Text("The entire file returns to its saved state. Restore will refuse if any later edits are present.") }
+    }
+}
+
+struct IncludeRulesView: View {
+    @EnvironmentObject var model: AppModel
+    @State private var editingRule: IncludeRule?
+    @State private var condition = ""
+    @State private var path = ""
+    var body: some View {
+        Card(title: "Includes and profiles", icon: "doc.on.doc") {
+            Text("Rules in the main Git config are listed in file order. Values in a profile can override earlier settings when its rule matches; later settings may override them again.").font(.callout).foregroundStyle(.secondary)
+            if model.includeRules.isEmpty { Text("No include rules configured.").foregroundStyle(.secondary) }
+            ForEach(model.includeRules) { rule in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(rule.title).font(.headline).textSelection(.enabled)
+                        Spacer()
+                        Label(rule.exists ? "Exists" : "Missing", systemImage: rule.exists ? "doc.text" : "doc.badge.plus").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Text(rule.path).font(.callout.monospaced()).textSelection(.enabled)
+                    if let target = rule.target, target.path != rule.path { Text(target.path).font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled) }
+                    ForEach(Array(rule.overrides.enumerated()), id: \.offset) { _, value in
+                        Text("\(value.key) = \(value.value)").font(.caption.monospaced()).textSelection(.enabled)
+                    }
+                    if rule.overrides.isEmpty && rule.editIssue == nil { Text("No supported overrides stored in this file.").font(.caption).foregroundStyle(.secondary) }
+                    if let issue = rule.editIssue { Text(issue).font(.caption).foregroundStyle(.secondary) }
+                    HStack {
+                        Button(rule.exists ? "Edit profile" : "Create profile") { model.selectProfile(rule.target) }.disabled(model.busy || rule.editIssue != nil || rule.target == nil)
+                        Button("Change rule") { editingRule = rule; condition = rule.condition ?? ""; path = rule.path }.disabled(model.busy)
+                        Button("Remove rule…") { model.previewRule(rule, draft: nil) }.disabled(model.busy)
+                    }
+                }.padding(.vertical, 8)
+                Divider()
+            }
+            Text(editingRule == nil ? "Add an include rule" : "Change selected rule").font(.headline)
+            TextField("Condition; leave empty to always include", text: $condition).textFieldStyle(.roundedBorder)
+            Text(verbatim: "gitdir:~/repos/ · gitdir/i:~/REPOS/ · onbranch:topic/** · hasconfig:remote.*.url:https://example.com/**").font(.caption).foregroundStyle(.secondary)
+            TextField("Profile path, e.g. ~/.gitconfig-public", text: $path).textFieldStyle(.roundedBorder)
+            Text("Use a file inside your home folder. Relative paths resolve beside the main config. To create a profile, apply its rule, then choose Create profile and edit its settings. Removing a rule keeps the file.").font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Button("Preview rule") { model.previewRule(editingRule, draft: .init(condition: condition.isEmpty ? nil : condition, path: path)) }.buttonStyle(.borderedProminent).disabled(model.busy || path.isEmpty)
+                if editingRule != nil { Button("Add a different rule") { editingRule = nil; condition = ""; path = "" }.disabled(model.busy) }
+            }
+        }
+        .onChange(of: model.lastRefreshed) { _, _ in editingRule = nil; condition = ""; path = "" }
+    }
+}
+
+struct IdentityCheckView: View {
+    @EnvironmentObject var model: AppModel
+    @State private var choosingFolder = false
+    @State private var folderPath = ""
+    var body: some View {
+        Card(title: "Effective identity in a folder", icon: "folder.badge.person.crop") {
+            Text("Choose a repository or folder to ask Git which identity it would use there, including matching rules and repository overrides. This reads config only.").font(.callout).foregroundStyle(.secondary)
+            HStack {
+                TextField("Folder path, including hidden folders", text: $folderPath).textFieldStyle(.roundedBorder)
+                    .onSubmit { if !model.busy { model.checkIdentity(path: folderPath) } }
+                Button("Choose folder…") { choosingFolder = true }.disabled(model.busy)
+                Button("Check identity") { model.checkIdentity(path: folderPath) }.disabled(model.busy || folderPath.isEmpty)
+            }
+            if let identity = model.identity {
+                Text(identity.folder.path).font(.caption.monospaced()).textSelection(.enabled)
+                if identity.values.isEmpty { Text("No identity or signing settings configured here.").foregroundStyle(.secondary) }
+                ForEach(identity.values) { value in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("\(value.key) = \(value.value)").font(.callout.monospaced()).textSelection(.enabled)
+                        Text("\(value.scope) · \(value.origin)").font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                    }
+                }
+                if !identity.values.contains(where: { $0.key == "user.email" }) { Text("user.email is not configured in this folder.").font(.callout).foregroundStyle(.secondary) }
+            }
+        }
+        .onChange(of: model.identity?.folder) { _, folder in if let folder { folderPath = folder.path } }
+        .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder]) { result in
+            switch result {
+            case .success(let folder): model.checkIdentity(in: folder)
+            case .failure(let error): model.error = error.localizedDescription
+            }
+        }
     }
 }
 

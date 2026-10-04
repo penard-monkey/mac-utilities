@@ -24,6 +24,7 @@ public struct ChangePreview: Identifiable, Sendable {
     public let before: FileState
     public let after: FileState
     public let summary: String
+    public var authorization: GitAuthorization? = nil
     public var diff: String {
         let old = before.text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         let new = after.text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
@@ -46,6 +47,7 @@ public struct BackupRecord: Codable, Identifiable, Sendable {
     public let before: FileState
     public let after: FileState
     public let summary: String
+    public var authorization: GitAuthorization? = nil
 }
 
 public struct TransactionStore: Sendable {
@@ -62,26 +64,43 @@ public struct TransactionStore: Sendable {
         return try action()
     }
 
+    private func authorized<T>(_ authorization: GitAuthorization?, target: URL, action: () throws -> T) throws -> T {
+        guard let authorization else { return try action() }
+        try authorization.validate(target)
+        // Hold both Git locks while publishing a profile, so rule changes and
+        // profile writes cannot race through the app or another Git writer.
+        return try locked(authorization.root) {
+            try authorization.validate(target)
+            return try action()
+        }
+    }
+
     public func apply(_ preview: ChangePreview) throws -> BackupRecord {
-        try locked(preview.target) {
-            guard try FileState.read(preview.target) == preview.before else { throw AppError.message("The file changed since this preview. Refresh and preview again.") }
-            guard preview.before != preview.after else { throw AppError.message("There are no changes to apply.") }
-            let fm = FileManager.default
-            try fm.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-            let record = BackupRecord(id: "\(Int(Date().timeIntervalSince1970))-\(UUID().uuidString)", date: Date(), path: preview.target.path, before: preview.before, after: preview.after, summary: preview.summary)
-            let location = directory.appendingPathComponent(record.id + ".json")
-            try JSONEncoder().encode(record).write(to: location, options: .atomic)
-            try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: location.path)
-            try write(preview.after, to: preview.target)
-            return record
+        try authorized(preview.authorization, target: preview.target) {
+            try locked(preview.target) {
+                try preview.authorization?.validate(preview.target)
+                guard try FileState.read(preview.target) == preview.before else { throw AppError.message("The file changed since this preview. Refresh and preview again.") }
+                guard preview.before != preview.after else { throw AppError.message("There are no changes to apply.") }
+                let fm = FileManager.default
+                try fm.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+                let record = BackupRecord(id: "\(Int(Date().timeIntervalSince1970))-\(UUID().uuidString)", date: Date(), path: preview.target.path, before: preview.before, after: preview.after, summary: preview.summary, authorization: preview.authorization)
+                let location = directory.appendingPathComponent(record.id + ".json")
+                try JSONEncoder().encode(record).write(to: location, options: .atomic)
+                try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: location.path)
+                try write(preview.after, to: preview.target)
+                return record
+            }
         }
     }
 
     public func restore(_ record: BackupRecord) throws {
         let target = URL(fileURLWithPath: record.path)
-        try locked(target) {
-            guard try FileState.read(target) == record.after else { throw AppError.message("Restore refused: the file has later edits. Use the backup for manual recovery so those edits are preserved.") }
-            try write(record.before, to: target)
+        try authorized(record.authorization, target: target) {
+            try locked(target) {
+                try record.authorization?.validate(target)
+                guard try FileState.read(target) == record.after else { throw AppError.message("Restore refused: the file has later edits. Use the backup for manual recovery so those edits are preserved.") }
+                try write(record.before, to: target)
+            }
         }
     }
 

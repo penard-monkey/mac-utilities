@@ -49,10 +49,10 @@ class ReleaseTests(unittest.TestCase):
                 lines.append(hashlib.sha256(path.read_bytes()).hexdigest()+'  '+path.name+'\n')
         (self.assets/'checksums.txt').write_text(''.join(lines))
 
-    def app(self, name, bundle_id, executable, parent):
+    def app(self, name, bundle_id, executable, parent, version='1.0.0'):
         app = parent/name
         (app/'Contents/MacOS').mkdir(parents=True)
-        (app/'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':bundle_id, 'CFBundleExecutable':executable, 'CFBundleShortVersionString':'1.0.0'}))
+        (app/'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':bundle_id, 'CFBundleExecutable':executable, 'CFBundleShortVersionString':version}))
         binary = app/'Contents/MacOS'/executable
         binary.write_text('#!/bin/bash\nexit 0\n')
         binary.chmod(0o755)
@@ -91,7 +91,7 @@ class ReleaseTests(unittest.TestCase):
         (app/'Contents/Resources/release-config.json').write_text(json.dumps({'repo':meta['repo'],'version':meta['version']}))
         shutil.copytree(catalog, app/'Contents/Resources/Catalog')
         self.zip(app, meta['manager'])
-        utility_app = self.app(manifest['app']['name'], manifest['app']['bundle_id'], 'GitSettings', stage)
+        utility_app = self.app(manifest['app']['name'], manifest['app']['bundle_id'], 'GitSettings', stage, version=manifest['version'])
         self.zip(utility_app, meta['utilities']['git-settings'])
         self.sums()
 
