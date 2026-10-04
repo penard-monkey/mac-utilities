@@ -55,9 +55,10 @@ import UniformTypeIdentifiers
                 do { try store.importFile(url); imported += 1 }
                 catch { failures.append(error.localizedDescription) }
             }
+            let importCount = imported, importFailures = failures
             Task { @MainActor in
-                self.message = "Imported \(imported) sticker(s)."
-                if !failures.isEmpty { self.error = "\(failures.count) file(s) could not be imported. " + failures[0] }
+                self.message = "Imported \(importCount) sticker(s)."
+                if !importFailures.isEmpty { self.error = "\(importFailures.count) file(s) could not be imported. " + importFailures[0] }
                 self.refresh()
             }
         }

@@ -2,6 +2,21 @@ import XCTest
 @testable import GIFStickers
 
 final class StickerLibraryTests: XCTestCase {
+    @MainActor func testBatchImportKeepsValidFileAndReportsInvalidFile() async throws {
+        let home = try StickerFixtures.temporaryHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let good = home.appendingPathComponent("good.webp"), bad = home.appendingPathComponent("bad.webp")
+        try StickerFixtures.animated.get().write(to: good)
+        try Data("invalid WebP".utf8).write(to: bad)
+        let model = LibraryModel(store: StickerLibrary(home: home))
+        model.importFiles([good, bad])
+        let deadline = Date().addingTimeInterval(3)
+        while model.stickers.isEmpty && Date() < deadline { await Task.yield() }
+        XCTAssertEqual(model.stickers.count, 1)
+        XCTAssertEqual(model.message, "Imported 1 sticker(s).")
+        XCTAssertTrue(model.error?.contains("1 file(s) could not be imported") == true)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: good.path))
+    }
     func testExportsAndImportsPreserveBytesWithoutOverwriting() throws {
         let home = try StickerFixtures.temporaryHome()
         defer { try? FileManager.default.removeItem(at: home) }
