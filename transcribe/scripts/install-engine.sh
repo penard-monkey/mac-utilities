@@ -92,6 +92,16 @@ fi
   "$src/launchd/$label.plist.tmpl" > "$plist.new"
 /usr/bin/plutil -lint -s "$plist.new"
 /bin/launchctl bootout "gui/$uid/$label" 2>/dev/null || true
+# bootout returns before launchd has released the label; bootstrapping before
+# that fails with "Bootstrap failed: 5: Input/output error" and leaves the
+# engine unloaded. Wait for the label itself, not just the port.
+for _ in $(seq 1 40); do
+  /bin/launchctl print "gui/$uid/$label" >/dev/null 2>&1 || break; sleep 0.25
+done
+if /bin/launchctl print "gui/$uid/$label" >/dev/null 2>&1; then
+  echo "engine: launchd still holds $label after bootout; try again in a moment" >&2
+  rm -f "$plist.new"; exit 1
+fi
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   /usr/sbin/lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1 || break; sleep 0.5
 done
@@ -100,7 +110,19 @@ if /usr/sbin/lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
   /usr/sbin/lsof -nP -iTCP:"$port" -sTCP:LISTEN >&2; rm -f "$plist.new"; exit 1
 fi
 mv "$plist.new" "$plist"
-/bin/launchctl bootstrap "gui/$uid" "$plist"
+# Error 5 can still be transient right after a bootout; retry briefly so a
+# slow launchd never leaves the engine unloaded.
+loaded=0
+for _ in 1 2 3 4 5; do
+  if /bin/launchctl bootstrap "gui/$uid" "$plist" 2>/dev/null; then loaded=1; break; fi
+  /bin/launchctl print "gui/$uid/$label" >/dev/null 2>&1 && { loaded=1; break; }
+  sleep 1
+done
+if [ "$loaded" != 1 ]; then
+  echo "engine: launchctl bootstrap of $label failed; load it with:" >&2
+  echo "  launchctl bootstrap gui/$uid $plist" >&2
+  exit 1
+fi
 
 # 5. the `transcribe` command.
 mkdir -p "$HOME/.local/bin"
