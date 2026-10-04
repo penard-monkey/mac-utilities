@@ -42,6 +42,8 @@ close-out ritual (global `/close-out` skill; this repo's settings in
 
 ## GIF Stickers
 
+- **Search the library by name.** Names are the filename stems as of 1.2.0.
+  ([session](docs/sessions/2026-10-04-gif-stickers-add-rename/summary.md))
 - **First real send.** Send a sticker from the library to yourself, then
   favourite it on the phone. ([session](docs/sessions/2026-10-04-gif-stickers-library/summary.md))
 - **A `kind=gif` path.** saywhat also accepts looping MP4 "GIFs"; the app only
