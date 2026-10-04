@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0]
+
+- GIF Stickers: open PNG, JPEG, HEIC/HEIF, TIFF and static WebP images,
+  upright and with transparency preserved, and export static 512×512 stickers
+  within WhatsApp’s 100 KB limit.
+- Optional **Cut out subject** removes still-image backgrounds on-device,
+  keeps all detected subjects, and caches the result for quick re-framing.
+
 ## [1.2.0]
 
 - GIF Stickers: Add to Library (⌘S) saves the preview directly, with a safe

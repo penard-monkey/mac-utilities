@@ -14,8 +14,9 @@ enum StickerFixtures {
     private static func make(frames: Int) throws -> Data {
         let directory = try temporaryHome()
         defer { try? FileManager.default.removeItem(at: directory) }
-        let gif = directory.appendingPathComponent("fixture.gif")
-        let destination = try XCTUnwrap(CGImageDestinationCreateWithURL(gif as CFURL, UTType.gif.identifier as CFString, frames, nil))
+        let type: UTType = frames == 1 ? .png : .gif
+        let gif = directory.appendingPathComponent("fixture." + (type.preferredFilenameExtension ?? "gif"))
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithURL(gif as CFURL, type.identifier as CFString, frames, nil))
         for index in 0..<frames {
             let context = try XCTUnwrap(CGContext(data: nil, width: 32, height: 32, bitsPerComponent: 8, bytesPerRow: 0,
                 space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))

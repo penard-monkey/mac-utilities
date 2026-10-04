@@ -48,6 +48,23 @@ final class SayWhatClientTests: XCTestCase {
         try await client.send(data)
         await fulfillment(of: [received], timeout: 3)
     }
+    func testStaticStickerAcceptedByStub() async throws {
+        let home = try StickerFixtures.temporaryHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let data = try StickerFixtures.still.get()
+        XCTAssertTrue(try WebPMetadata(data: data).delays.isEmpty)
+        let received = expectation(description: "Static sticker upload")
+        let server = try StubServer { request in
+            XCTAssertEqual(request.path, "/send")
+            XCTAssertTrue(request.body.range(of: Data("image/webp".utf8)) != nil)
+            XCTAssertTrue(request.body.range(of: data) != nil)
+            XCTAssertTrue(request.body.range(of: Data("sticker".utf8)) != nil)
+            received.fulfill()
+            return .init(body: self.success)
+        }
+        try await SayWhatClient(baseURL: server.url, secretURL: fixtureSecret(home)).send(data)
+        await fulfillment(of: [received], timeout: 3)
+    }
     func testMissingSecretDisablesProbeAndRefusesSendWithoutNetwork() async throws {
         let home = try StickerFixtures.temporaryHome()
         defer { try? FileManager.default.removeItem(at: home) }
