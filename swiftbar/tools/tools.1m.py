@@ -8,6 +8,18 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Menu bar glyph: docs/icons/tools-glyph-mono.svg at 36 px (18 pt @2x), a template image.
+MENU_ICON = (
+    'iVBORw0KGgoAAAANSUhEUgAAACQAAAAkCAYAAADhAJiYAAAAAXNSR0IArs4c6QAAADhlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAA'
+    'GgAAAAAAAqACAAQAAAABAAAAJKADAAQAAAABAAAAJAAAAAAJxsHGAAAByklEQVRYCe2XMU4DMRBFA0KCnksgaiTqICrOwpG4BlQR'
+    'lDTUiEtQQwX8F8XW312vnWQCodiRJrE8/8+Mx7Nr72w2Sb0CByPmM81fS0+lfcy35t6lC+mbtCRRfvZ5rNGd9EtK4JqCAQsnSZSf'
+    '/OR/AtSSKNngJInyO9tBmV+laYseNH6RkoQL9gvpzWoS+/lqHOEPtv9WTlMF7lcBan9gEh5ulL+MdWgRaeAkVKYljoEb5S/jHVnU'
+    'tFVM9bfJYHnoGOeG+F6hHGmfgymhVvW9h2o9UfLjfeNcsG4rcfuYzPeEOA6S8J5piWOcC89tY34ck/m+kn/3YmQl0Vd/lD+oZvRw'
+    'jPJHmy96fdia7009KFdggoNycFhu4y9ccgW9lD5KP6Q8ziXFBgZsVaJNSYBPaSmJ0hzYTlK7fOzZIlY9l24iTwJflQi7uM+wFaVK'
+    '1ObgZPHDdRf3mZPsef1Bh+MJ+faxopY4xrktXtXuCVWBf2WcEmpV2iu0aU943zi3FbNq94TynUQMv6uMOXBM4vKi21Q6HD/LFvLE'
+    'Slk5H4F8d/Gp0189dpLxD0W4yLN0vhyt/wNnVPZ+dPQz2/vh6o3pyW19n3En0/g3KvADBZQz3m136CsAAAAASUVORK5CYII='
+)
+
 CONFIG_DIR = Path.home() / '.config/mac-utilities'
 CONFIG = CONFIG_DIR / 'tools.json'
 MANAGED = CONFIG_DIR / 'installed-tools.json'
@@ -92,7 +104,7 @@ def main():
         else:
             raise ValueError('Unknown action')
         return
-    print('Tools | sfimage=shippingbox dropdown=false')
+    print('Tools | templateImage={} dropdown=false'.format(MENU_ICON))
     print('---')
     script = Path(__file__).resolve()
     tools, errors = entries()
