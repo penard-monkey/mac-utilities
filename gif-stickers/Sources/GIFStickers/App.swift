@@ -260,13 +260,27 @@ struct EditorView: View {
             }
             HStack(alignment: .top, spacing: 28) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Frame your animation").font(.headline)
+                    HStack {
+                        Text("Frame your animation").font(.headline)
+                        Spacer()
+                        if model.asset != nil {
+                            Button("Choose another file…", action: model.openPanel).controlSize(.small)
+                        }
+                    }
                     ZStack {
                         RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.06))
                         if let asset = model.asset {
                             GIFCanvas(asset: asset, framing: $model.framing).padding(14)
                         } else {
-                            Text("Drop a GIF or a looping video here\n(MP4, M4V, MOV) or use File → Open").multilineTextAlignment(.center).foregroundStyle(.secondary)
+                            Button(action: model.openPanel) {
+                                Text("Click or drop a GIF or looping video here\n(MP4, M4V, MOV)")
+                                    .multilineTextAlignment(.center).foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .contentShape(Rectangle())
+                            }.buttonStyle(.plain)
+                                .keyboardShortcut(.defaultAction)
+                                .accessibilityLabel("Open GIF or video")
+                                .accessibilityHint("Choose a GIF, MP4, M4V or MOV file to frame.")
                         }
                     }.frame(minWidth: 360, maxWidth: .infinity).frame(height: 512)
                     Text("Drag the square to pan · drag its corner or scroll to zoom").font(.caption).foregroundStyle(.secondary)
