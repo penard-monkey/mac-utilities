@@ -36,7 +36,9 @@ It does not change your default media application or install a background job.
    Vision removes the background on this Mac and keeps all detected subjects.
    The first attempt takes a moment; its result is cached while the image is
    loaded, so toggling and re-framing reuse it. If no subject is found or
-   processing fails, the app explains the problem and keeps the original.
+   processing fails, the app explains the problem and keeps the original. If
+   Vision cannot run on this Mac, the toggle is disabled for the session with
+   “Subject cut-out isn’t available on this Mac.”
 5. Wait for the **512 × 512** preview. It plays the actual encoded WebP,
    with checkerboard behind transparent pixels. Changing the frame clears the old
    preview and prepares a new one after a short pause.

@@ -1,6 +1,7 @@
 import XCTest
 import ImageIO
 import CoreImage
+import Vision
 import UniformTypeIdentifiers
 @testable import GIFStickers
 
@@ -177,6 +178,30 @@ final class StillImageTests: XCTestCase {
         XCTAssertEqual(editor.displayedAsset?.url, replacement)
     }
 
+    @MainActor func testUnavailableVisionDisablesCutoutAndKeepsOriginalPreview() async throws {
+        let directory = try StickerFixtures.temporaryHome()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = try write(image(), type: .png, in: directory)
+        let unavailable = NSError(domain: VNErrorDomain, code: VNErrorCode.internalError.rawValue,
+            userInfo: [NSLocalizedDescriptionKey: "Could not create inference context"])
+        XCTAssertTrue(SubjectCutout.isUnavailable(unavailable))
+        XCTAssertFalse(SubjectCutout.isUnavailable(NSError(domain: VNErrorDomain,
+            code: VNErrorCode.internalError.rawValue, userInfo: [NSLocalizedDescriptionKey: "Different failure"])))
+        let editor = EditorModel(library: LibraryModel(store: StickerLibrary(home: directory)), cutout: { _ in throw unavailable })
+        editor.asset = try AnimationAsset(url: url)
+        editor.framing = .centered(try XCTUnwrap(editor.asset).size)
+        editor.cutOutSubject = true; editor.update()
+        let deadline = Date().addingTimeInterval(5)
+        while editor.busy && Date() < deadline { try await Task.sleep(nanoseconds: 10_000_000) }
+        XCTAssertFalse(editor.busy)
+        XCTAssertNotNil(editor.result)
+        XCTAssertFalse(editor.cutoutAvailable)
+        XCTAssertFalse(editor.cutOutSubject)
+        XCTAssertTrue(editor.displayedAsset === editor.asset)
+        XCTAssertEqual(editor.error, SubjectCutout.unavailableMessage)
+        XCTAssertTrue(editor.message.contains(SubjectCutout.unavailableMessage))
+    }
+
     func testVisionSubjectCutoutAndCache() throws {
         let directory = try StickerFixtures.temporaryHome()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -187,6 +212,11 @@ final class StillImageTests: XCTestCase {
         catch {
             if error.localizedDescription.contains("No subject found") {
                 throw XCTSkip("Vision found no instances in this synthetic shape on this runner")
+            }
+            // Virtual Macs may lack the inference device required by subject lifting.
+            // Independent mask application and editor fallback remain required tests.
+            if SubjectCutout.isUnavailable(error) {
+                throw XCTSkip("Vision inference is unavailable on this Mac; independent mask tests still run")
             }
             throw error
         }

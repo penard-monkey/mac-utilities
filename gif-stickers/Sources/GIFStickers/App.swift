@@ -13,10 +13,16 @@ final class CancellationFlag: @unchecked Sendable {
 
 @MainActor final class EditorModel: ObservableObject {
     let library: LibraryModel
-    init(library: LibraryModel? = nil) { self.library = library ?? LibraryModel() }
+    private let cutout: @Sendable (AnimationAsset) throws -> AnimationAsset
+    init(library: LibraryModel? = nil,
+         cutout: @escaping @Sendable (AnimationAsset) throws -> AnimationAsset = { try $0.cuttingOutSubject() }) {
+        self.library = library ?? LibraryModel()
+        self.cutout = cutout
+    }
     @Published var asset: AnimationAsset?
     @Published var displayedAsset: AnimationAsset?
     @Published var cutOutSubject = false
+    @Published private(set) var cutoutAvailable = true
     @Published var framing = Framing()
     @Published var result: ExportResult?
     @Published var busy = false
@@ -61,29 +67,37 @@ final class CancellationFlag: @unchecked Sendable {
         guard let asset else { return }
         busy = true; message = "Preparing sticker preview…"
         let frame = framing, version = revision
-        let cutOut = cutOutSubject
+        let cutOut = cutOutSubject && cutoutAvailable
+        let cutout = cutout
         let cancellation = cancellation
         pending = Task {
             do { try await Task.sleep(nanoseconds: 350_000_000) } catch { return }
             queue.async {
                 var effectiveAsset = asset
                 var cutoutError: String?
+                var unavailable = false
                 if cutOut {
-                    do { effectiveAsset = try asset.cuttingOutSubject() }
-                    catch { cutoutError = error.localizedDescription }
+                    do { effectiveAsset = try cutout(asset) }
+                    catch {
+                        unavailable = SubjectCutout.isUnavailable(error)
+                        cutoutError = unavailable ? SubjectCutout.unavailableMessage : error.localizedDescription
+                    }
                 }
-                let preparedAsset = effectiveAsset, failure = cutoutError
+                let preparedAsset = effectiveAsset, failure = cutoutError, cutoutUnavailable = unavailable
                 let output = Result { try Encoder.export(asset: preparedAsset, framing: frame, cancelled: { cancellation.cancelled }) }
                 Task { @MainActor in
                     guard version == self.revision else { return }
                     self.busy = false
                     self.displayedAsset = preparedAsset
+                    if cutoutUnavailable { self.cutoutAvailable = false }
                     if let failure {
                         self.cutOutSubject = false
                         self.error = failure
                     }
                     switch output {
-                    case .success(let result): self.result = result; self.message = result.summary
+                    case .success(let result):
+                        self.result = result
+                        self.message = cutoutUnavailable ? SubjectCutout.unavailableMessage + ". Kept the original image." : result.summary
                     case .failure(let error): self.error = error.localizedDescription; self.message = "Preview failed."
                     }
                 }
@@ -319,7 +333,8 @@ struct EditorView: View {
                 if model.asset?.isStillImage == true {
                     Toggle("Cut out subject", isOn: $model.cutOutSubject)
                         .toggleStyle(.checkbox)
-                        .help("Remove the background on this Mac, keeping all detected subjects.")
+                        .disabled(!model.cutoutAvailable)
+                        .help(model.cutoutAvailable ? "Remove the background on this Mac, keeping all detected subjects." : SubjectCutout.unavailableMessage)
                 }
                 Spacer()
                 Button("Send to my WhatsApp") {

@@ -150,6 +150,12 @@ final class AnimationAsset: @unchecked Sendable {
 }
 
 enum SubjectCutout {
+    static let unavailableMessage = "Subject cut-out isn't available on this Mac"
+    static func isUnavailable(_ error: Error) -> Bool {
+        let error = error as NSError
+        return error.domain == VNErrorDomain && error.code == VNErrorCode.internalError.rawValue
+            && error.localizedDescription == "Could not create inference context"
+    }
     static func removeBackground(from image: CGImage) throws -> CGImage {
         let handler = VNImageRequestHandler(cgImage: image, options: [:])
         let request = VNGenerateForegroundInstanceMaskRequest()
