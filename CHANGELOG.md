@@ -2,6 +2,9 @@
 
 ## [1.1.0]
 
+- GIF Stickers: click or use the keyboard to open a file from the empty frame,
+  and choose a replacement without interfering with cropping or drag and drop.
+
 - Git & SSH lists include rules and profile overrides, edits referenced profiles
   inside the home folder, and previews adding, changing or removing rules.
 - Create a profile by adding its rule and applying settings to the new file;

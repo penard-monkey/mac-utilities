@@ -19,9 +19,11 @@ It does not change your default GIF application or install a background job.
 
 ## Use
 
-1. Choose **File → Open GIF or Video…** (⌘O), or drop a file onto the window or
-   Dock icon. Besides GIFs, it takes the short looping videos many sites serve as
-   "GIFs" (MP4, M4V or MOV).
+1. Click the empty **Frame your animation** box (or activate it with Return),
+   choose **File → Open GIF or Video…** (⌘O), or drop a file onto the window or
+   Dock icon. With a file loaded, use **Choose another file…** to replace it;
+   clicking the canvas keeps working for cropping. Besides GIFs, it takes the
+   short looping videos many sites serve as "GIFs" (MP4, M4V or MOV).
 2. In **Crop**, drag the square to choose its position. Drag the bottom-right
    corner to resize it, or scroll over the animation to zoom around the square's center.
    The source keeps its aspect ratio. **Reset** centers the largest square.
