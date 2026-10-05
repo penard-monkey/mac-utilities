@@ -10,6 +10,7 @@ are archived beside its summary as `planning.tar.gz`.
 
 | Date | Session |
 | --- | --- |
+| 2026-10-04 | [GIF Stickers still images and cut-out](2026-10-04-gif-stickers-images/summary.md): stickers from PNG/JPEG/HEIC/TIFF/WebP with an on-device Vision subject cut-out; static stickers need `cwebp` because `img2webp` wraps one frame in an animation container, and Vision cannot run on GitHub's virtual runners |
 | 2026-10-04 | [GIF Stickers Add to Library and rename](2026-10-04-gif-stickers-add-rename/summary.md): export became a dialog-free Add to Library with safe, non-overwriting names, and stickers can be renamed; the filename is the name, groundwork for search |
 | 2026-10-04 | [GIF Stickers library and send](2026-10-04-gif-stickers-library/summary.md): click the empty frame to open a file, a sticker library, and Send to my WhatsApp through saywhat's signed self-only endpoint. A direct-to-GOWA version was built and dropped so saywhat stays the one owner of the WhatsApp session |
 | 2026-10-04 | [Git & SSH include rules](2026-10-04-git-includes/summary.md): inventory and edit include/includeIf profiles with the same preview/apply/restore safety, confined to referenced files inside the home folder |
