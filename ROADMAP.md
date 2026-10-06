@@ -25,6 +25,14 @@ close-out ritual (global `/close-out` skill; this repo's settings in
 - **Speaker labels.** Dropped for v1 to avoid torch; would need pyannote.
   ([session](docs/sessions/2026-10-03-transcribe/summary.md))
 
+## Video Preview
+
+- **Look at the host app window once.** Format list, On status, Refresh Quick
+  Look and Licenses were not checked by the user.
+  ([session](docs/sessions/2026-10-06-video-preview/summary.md))
+- **`.ogv` support** once a Theora sample can be generated to verify it.
+  ([session](docs/sessions/2026-10-06-video-preview/summary.md))
+
 ## Git & SSH
 
 - **Try the folder picker by hand.** The effective-identity view was verified
