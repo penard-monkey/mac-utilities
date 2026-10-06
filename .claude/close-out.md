@@ -21,6 +21,7 @@ touched, from its folder:
 swift test --package-path gif-stickers          # gif-stickers
 swift test --package-path transcribe            # transcribe app core
 /usr/bin/python3 -m unittest discover -s transcribe/engine   # transcribe engine contract
+/usr/bin/python3 -m unittest discover -s video-preview/tests  # video-preview (builds with Xcode)
 bash -n scripts/*.sh */scripts/*.sh             # every shell script
 /usr/bin/python3 -m py_compile swiftbar/*/*.py */swiftbar/*.py  # Python plugins
 ```

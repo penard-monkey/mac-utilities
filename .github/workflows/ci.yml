@@ -10,5 +10,13 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode
+        # Video Preview's Quick Look extension needs Xcode; pin the version it is proven with.
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app && xcodebuild -version
+      - name: Cache VLCKit download
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mac-utilities/vlckit
+          key: vlckit-${{ hashFiles('video-preview/scripts/fetch-vlckit.sh') }}
       - run: /bin/bash scripts/release/test.sh
       - run: /usr/bin/python3 scripts/release/version_gate.py --repository "$GITHUB_REPOSITORY"

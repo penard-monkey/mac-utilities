@@ -9,6 +9,7 @@ Shared style: ink tile `#16181D`, cream `#F4F1EA` strokes, one accent per utilit
 | Git & SSH | `git-ssh.svg` | `git-settings/Resources/AppIcon.icns` |
 | GIF Stickers | `gif-stickers.svg` | `gif-stickers/Resources/AppIcon.icns` |
 | Transcribe | `transcribe.svg` | `transcribe/Resources/AppIcon.icns` |
+| Video Preview | `video-preview.svg` | `video-preview/Resources/AppIcon.icns` |
 | QR Reader | `qr-reader.svg` | not built yet; the utility does not exist |
 | Memory | `memory-glyph-{mono,color}.svg` | not wired; the plugin keeps its pressure-tinted SF Symbol |
 | Tools | `tools-glyph-{mono,color}.svg` | embedded as a template image in `swiftbar/tools/tools.1m.py` |

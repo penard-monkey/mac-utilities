@@ -9,6 +9,7 @@ Small, independent tools for this Mac, with a shared installer and Tools menu.
 | [GIF Stickers](gif-stickers/) | Tools → GIF Stickers | Native GIF cropping and WebP sticker export |
 | [Memory](swiftbar/memory/) | Own menu-bar item | Memory usage and pressure, with configurable looks |
 | [Transcribe](transcribe/) | Tools → Transcribe, own menu-bar item | Local audio/video transcription (mlx-whisper), saved next to the file; `transcribe` command |
+| [Video Preview](video-preview/) | Finder Quick Look (Space) | Plays MKV, WebM, AVI, FLV and WMV videos with sound in Quick Look (VLCKit) |
 | [Tools](swiftbar/tools/) | Shared menu-bar item | Launch installed utility apps and custom app entries |
 
 ## Install
@@ -53,7 +54,11 @@ item. Hiding an item is separate from uninstalling it.
 
 Requires macOS 14+, Apple's Swift toolchain to build native apps, and SwiftBar
 for menu-bar items. GIF Stickers also needs Homebrew `webp`, and Transcribe needs
-`ffmpeg` and `uv`; the manager reports missing dependencies. Transcribe's
+`ffmpeg` and `uv`; the manager reports missing dependencies. Building Video
+Preview from a checkout needs Xcode (it has a Quick Look extension); release
+installs need nothing extra. Video Preview cannot load subtitle files that sit
+next to a video, and a browser-downloaded (quarantined) copy is blocked by
+Gatekeeper until you choose **Open Anyway** or install with `--strip-quarantine`. Transcribe's
 engine stays installed after the manager removes the app; see its README.
 Privileged utilities from extra repositories retain their own administrator
 setup and removal scripts.

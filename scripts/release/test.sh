@@ -21,14 +21,14 @@ done
 # Source-only engine suites do not live in tests/.
 for suite in */engine; do
   [[ -d "$suite" ]] || continue
-  rg --files "$suite" -g 'test_*.py' | rg -q . || continue
+  [[ -n "$(/usr/bin/find "$suite" -name 'test_*.py' -type f)" ]] || continue
   /usr/bin/python3 -B -m unittest discover -s "$suite" -v
 done
 # Test suites that land with source-only engines are discovered independently.
 for suite in */tests; do
   [[ "$suite" == utilities-manager/tests || "$suite" == scripts/tests ]] && continue
   [[ -d "$suite" ]] || continue
-  rg --files "$suite" -g 'test_*.py' | rg -q . || continue
+  [[ -n "$(/usr/bin/find "$suite" -name 'test_*.py' -type f)" ]] || continue
   /usr/bin/python3 -B -m unittest discover -s "$suite" -v
 done
 for script in install.sh scripts/*.sh scripts/release/*.sh */scripts/*.sh; do /bin/bash -n "$script"; done

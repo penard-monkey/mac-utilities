@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "id": "video-preview",
+  "name": "Video Preview",
+  "version": "1.0.0",
+  "description": "Press Space on MKV, WebM, AVI, FLV and WMV videos in Finder to play them, with sound, in Quick Look.",
+  "presentation": "app",
+  "app": {
+    "name": "Video Preview.app",
+    "bundle_id": "com.mac-utilities.video-preview",
+    "extensions": ["VideoPreviewQuickLook.appex"]
+  },
+  "install": {
+    "command": ["scripts/install.sh", "{applications}"]
+  },
+  "privileged": false,
+  "release": { "build": "scripts/build.sh" }
+}

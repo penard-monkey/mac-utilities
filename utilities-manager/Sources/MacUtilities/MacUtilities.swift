@@ -39,6 +39,7 @@ struct Utility: Decodable, Identifiable {
         case "travel-router": return "network"
         case "gif-stickers": return "photo.stack"
         case "git-settings": return "point.3.connected.trianglepath.dotted"
+        case "video-preview": return "play.rectangle"
         default: return "square.grid.2x2"
         }
     }

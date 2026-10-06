@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key><string>en</string>
+	<key>CFBundleDisplayName</key><string>$(PRODUCT_NAME)</string>
+	<key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIconFile</key><string>AppIcon</string>
+	<key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+	<key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
+	<key>LSMinimumSystemVersion</key><string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSHumanReadableCopyright</key><string>MIT License. Plays media with VLCKit (LGPL-2.1+).</string>
+	<key>NSPrincipalClass</key><string>NSApplication</string>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key><string>org.matroska.mkv</string>
+			<key>UTTypeDescription</key><string>Matroska video</string>
+			<key>UTTypeConformsTo</key><array><string>public.movie</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key><array><string>mkv</string></array>
+				<key>public.mime-type</key><array><string>video/x-matroska</string></array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key><string>org.webmproject.webm</string>
+			<key>UTTypeDescription</key><string>WebM video</string>
+			<key>UTTypeConformsTo</key><array><string>public.movie</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key><array><string>webm</string></array>
+				<key>public.mime-type</key><array><string>video/webm</string></array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key><string>public.avi</string>
+			<key>UTTypeDescription</key><string>AVI video</string>
+			<key>UTTypeConformsTo</key><array><string>public.movie</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key><array><string>avi</string></array>
+				<key>public.mime-type</key><array><string>video/avi</string></array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key><string>com.adobe.flash.video</string>
+			<key>UTTypeDescription</key><string>Flash video</string>
+			<key>UTTypeConformsTo</key><array><string>public.movie</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key><array><string>flv</string></array>
+				<key>public.mime-type</key><array><string>video/x-flv</string></array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key><string>com.microsoft.windows-media-wmv</string>
+			<key>UTTypeDescription</key><string>Windows Media video</string>
+			<key>UTTypeConformsTo</key><array><string>public.movie</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key><array><string>wmv</string></array>
+				<key>public.mime-type</key><array><string>video/x-ms-wmv</string></array>
+			</dict>
+		</dict>
+	</array>
+</dict>
+</plist>

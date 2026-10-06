@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0]
+
+- New utility, **Video Preview**: press Space in Finder to play MKV, WebM,
+  AVI, FLV and WMV videos with sound in Quick Look. Videos loop, and a click
+  pauses them. Playback uses VideoLAN's VLCKit 3.7.3 (LGPL-2.1+). The app
+  shows the extension's state, can turn it on or off, and refreshes Quick Look.
+- Mac Utilities registers an app's bundled extensions after installing it and
+  unregisters them before removal (`app.extensions` in the manifest).
+- Release builder: utilities can supply their own build hook (Video Preview
+  builds with Xcode). Every bundled binary is now checked for both
+  architectures and the macOS 14 target, and extensions for the App Sandbox.
+
 ## [1.3.0]
 
 - GIF Stickers: open PNG, JPEG, HEIC/HEIF, TIFF and static WebP images,
