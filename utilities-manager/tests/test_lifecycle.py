@@ -323,6 +323,47 @@ class LifecycleTests(unittest.TestCase):
         with self.assertRaisesRegex(lifecycle.LifecycleError, "escapes"):
             self.manager.install("memory")
 
+    def test_app_extensions_register_after_install_and_unregister_on_removal(self):
+        source, manifest = self.utility("video-preview", app=True)
+        manifest["app"]["extensions"] = ["Sample.appex"]
+        (source / "mac-utility.json").write_text(json.dumps(manifest))
+        calls = []
+        real_run = subprocess.run
+        def run(args, *rest, **options):
+            if str(args[0]).startswith(("/usr/bin/", "/System/")):
+                calls.append([str(a) for a in args])
+                return subprocess.CompletedProcess(args, 0)
+            return real_run(args, *rest, **options)
+        manager = lifecycle.Manager(self.repo, self.home, system_effects=True)
+        app = self.home / "Applications/Sample Utility.app"
+        appex = str(app / "Contents/PlugIns/Sample.appex")
+        with patch.object(lifecycle.Path, "home", return_value=self.home), patch.object(lifecycle.subprocess, "run", run):
+            manager.install("video-preview")
+            names = [c[0].rsplit("/", 1)[-1] + " " + c[1] for c in calls]
+            self.assertIn("lsregister -f", names)
+            self.assertIn(["/usr/bin/pluginkit", "-a", appex], calls)
+            self.assertIn(["/usr/bin/qlmanage", "-r"], calls)
+            self.assertLess(names.index("lsregister -f"), names.index("pluginkit -a"))
+            calls.clear()
+            manager.uninstall("video-preview")
+            self.assertIn(["/usr/bin/pluginkit", "-r", appex], calls)
+            self.assertIn(["/usr/bin/qlmanage", "-r"], calls)
+            self.assertFalse(app.exists())
+        # Without system effects nothing is registered.
+        calls.clear()
+        with patch.object(lifecycle.subprocess, "run", run):
+            self.manager.install("video-preview")
+            self.manager.uninstall("video-preview")
+        self.assertFalse([c for c in calls if "pluginkit" in c[0] or "qlmanage" in c[0] or "lsregister" in c[0]])
+
+    def test_app_extensions_must_be_appex_names(self):
+        source, manifest = self.utility("video-preview", app=True)
+        for bad in (["../Escape.appex"], ["Sub/Sample.appex"], ["Sample.app"], "Sample.appex"):
+            manifest["app"]["extensions"] = bad
+            (source / "mac-utility.json").write_text(json.dumps(manifest))
+            with self.assertRaises(lifecycle.LifecycleError):
+                self.manager.install("video-preview")
+
     def test_tampered_receipt_cannot_delete_other_directories(self):
         self.utility()
         self.manager.install("memory")
@@ -362,7 +403,7 @@ class LifecycleTests(unittest.TestCase):
         manifest["dependencies"] = [{"name": "img2webp", "paths": [str(self.base / "missing")], "help": "brew install webp"}]
         (source / "mac-utility.json").write_text(json.dumps(manifest))
         entries = self.manager.catalog()
-        self.assertEqual(len(entries), 5)
+        self.assertEqual(len(entries), len(lifecycle.CATALOG))
         self.assertFalse(next(u for u in entries if u["id"] == "git-settings")["available"])
         self.assertIn("brew install webp", next(u for u in entries if u["id"] == "memory")["missing_dependencies"][0])
 

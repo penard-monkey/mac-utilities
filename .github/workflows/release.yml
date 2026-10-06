@@ -10,6 +10,14 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode
+        # Video Preview's Quick Look extension needs Xcode; pin the version it is proven with.
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app && xcodebuild -version
+      - name: Cache VLCKit download
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mac-utilities/vlckit
+          key: vlckit-${{ hashFiles('video-preview/scripts/fetch-vlckit.sh') }}
       - name: Version gate
         env:
           RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
@@ -23,7 +31,7 @@ jobs:
         run: /usr/bin/python3 scripts/release/build.py --output "$RUNNER_TEMP/dist" --scratch "$RUNNER_TEMP/build"
       - name: Prove installer against actual artifacts in an isolated home
         env:
-          MAC_UTILITIES_INSTALL: memory,git-settings,gif-stickers,transcribe
+          MAC_UTILITIES_INSTALL: memory,git-settings,gif-stickers,transcribe,video-preview
         run: |
           /bin/bash install.sh --artifacts "$RUNNER_TEMP/dist" --home "$RUNNER_TEMP/proof-home" --no-system-effects
           /bin/bash install.sh --artifacts "$RUNNER_TEMP/dist" --home "$RUNNER_TEMP/proof-home" --no-system-effects update --all

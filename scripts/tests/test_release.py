@@ -63,22 +63,26 @@ class ReleaseTests(unittest.TestCase):
         stage.mkdir()
         meta = {'schema':1, 'repo':'penard-monkey/mac-utilities', 'tag':tag, 'version':tag[1:],
                 'manager':'utilities-manager-universal.app.zip', 'catalog':'mac-utilities-catalog.zip',
-                'utilities':{'git-settings':'git-settings-universal.app.zip'}, 'minimum_macos':'14.0'}
+                'utilities':{'git-settings':'git-settings-universal.app.zip',
+                             'video-preview':'video-preview-universal.app.zip'}, 'minimum_macos':'14.0'}
         (self.assets/'release.json').write_text(json.dumps(meta))
         shutil.copy2(ROOT/'scripts/release/install.py', self.assets/'release-runtime.py')
         catalog = stage/'Catalog'
         for utility_id in ('tools', 'memory'):
             shutil.copytree(ROOT/'swiftbar'/utility_id, catalog/'swiftbar'/utility_id, ignore=shutil.ignore_patterns('__pycache__', 'tests'))
-        app_source = catalog/'git-settings'
-        (app_source/'scripts').mkdir(parents=True)
-        manifest = json.loads((ROOT/'git-settings/mac-utility.json').read_text())
-        manifest['install'] = {'command':['scripts/release-install.sh', '{applications}']}
-        (app_source/'mac-utility.json').write_text(json.dumps(manifest))
-        (app_source/'release-app.json').write_text(json.dumps({'schema':1, 'repo':meta['repo'], 'tag':tag, 'asset':meta['utilities']['git-settings'], 'app':manifest['app'], 'version':manifest['version']}))
-        shutil.copy2(ROOT/'scripts/release/install.py', app_source/'release-install.py')
-        hook = app_source/'scripts/release-install.sh'
-        hook.write_text('#!/bin/bash\nset -eu\nROOT="$(cd "$(dirname "$0")/.." && pwd)"\nexec /usr/bin/python3 "$ROOT/release-install.py" --stage-app "$ROOT/release-app.json" "$1"\n')
-        hook.chmod(0o755)
+        manifests = {}
+        for utility_id in meta['utilities']:
+            app_source = catalog/utility_id
+            (app_source/'scripts').mkdir(parents=True)
+            manifest = json.loads((ROOT/utility_id/'mac-utility.json').read_text())
+            manifest['install'] = {'command':['scripts/release-install.sh', '{applications}']}
+            (app_source/'mac-utility.json').write_text(json.dumps(manifest))
+            (app_source/'release-app.json').write_text(json.dumps({'schema':1, 'repo':meta['repo'], 'tag':tag, 'asset':meta['utilities'][utility_id], 'app':manifest['app'], 'version':manifest['version']}))
+            shutil.copy2(ROOT/'scripts/release/install.py', app_source/'release-install.py')
+            hook = app_source/'scripts/release-install.sh'
+            hook.write_text('#!/bin/bash\nset -eu\nROOT="$(cd "$(dirname "$0")/.." && pwd)"\nexec /usr/bin/python3 "$ROOT/release-install.py" --stage-app "$ROOT/release-app.json" "$1"\n')
+            hook.chmod(0o755)
+            manifests[utility_id] = manifest
         (catalog/'release.json').write_text(json.dumps(meta))
         self.zip(catalog, meta['catalog'])
         app = self.app('Mac Utilities.app', 'com.macutilities.manager', 'MacUtilities', stage)
@@ -91,8 +95,15 @@ class ReleaseTests(unittest.TestCase):
         (app/'Contents/Resources/release-config.json').write_text(json.dumps({'repo':meta['repo'],'version':meta['version']}))
         shutil.copytree(catalog, app/'Contents/Resources/Catalog')
         self.zip(app, meta['manager'])
-        utility_app = self.app(manifest['app']['name'], manifest['app']['bundle_id'], 'GitSettings', stage, version=manifest['version'])
-        self.zip(utility_app, meta['utilities']['git-settings'])
+        for utility_id, executable in (('git-settings', 'GitSettings'), ('video-preview', 'Video Preview')):
+            manifest = manifests[utility_id]
+            utility_app = self.app(manifest['app']['name'], manifest['app']['bundle_id'], executable, stage, version=manifest['version'])
+            for name in manifest['app'].get('extensions', []):
+                extension = self.app(name, manifest['app']['bundle_id']+'.quicklook', 'Extension',
+                                     utility_app/'Contents/PlugIns', version=manifest['version'])
+                (extension/'Contents/Frameworks').mkdir()
+                (extension/'Contents/Frameworks/VLCKit.dylib').write_bytes(b'dylib')
+            self.zip(utility_app, meta['utilities'][utility_id])
         self.sums()
 
     def cli(self, *args, selected='memory,git-settings', success=True):
@@ -165,6 +176,17 @@ class ReleaseTests(unittest.TestCase):
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertTrue((self.home/'Applications/Git & SSH.app').exists())
+
+    def test_video_preview_installs_with_its_extension_and_uninstalls(self):
+        self.cli(selected='video-preview')
+        app = self.home/'Applications/Video Preview.app'
+        appex = app/'Contents/PlugIns/VideoPreviewQuickLook.appex'
+        self.assertTrue((appex/'Contents/Frameworks/VLCKit.dylib').is_file())
+        receipt = json.loads((self.support/'state/receipts/video-preview.json').read_text())
+        self.assertEqual(receipt['manifest']['app']['extensions'], ['VideoPreviewQuickLook.appex'])
+        self.cli('update', 'video-preview')
+        self.cli('uninstall', 'video-preview')
+        self.assertFalse(app.exists())
 
     def test_checkout_receipts_migrate_in_place_without_uninstall(self):
         # Use an actual checkout-built lifecycle receipt, then update from release.

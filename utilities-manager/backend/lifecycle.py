@@ -21,8 +21,9 @@ CATALOG = [
     ("transcribe", "Transcribe", "Local audio and video transcription."),
     ("gif-stickers", "GIF Stickers", "Create and export animated stickers."),
     ("git-settings", "Git & SSH", "Manage Git identity and SSH connections."),
+    ("video-preview", "Video Preview", "Play MKV, WebM and other videos in Quick Look."),
 ]
-IGNORE = shutil.ignore_patterns(".git", ".worktrees", ".worktrees.places.json", ".build", ".swiftpm",
+IGNORE = shutil.ignore_patterns(".git", ".worktrees", ".worktrees.places.json", ".build", ".swiftpm", "Vendor",
                                ".planning", "task_plan.md", "findings.md", "progress.md", "__pycache__", ".DS_Store")
 
 class LifecycleError(Exception):
@@ -84,6 +85,10 @@ def validate(manifest):
             raise LifecycleError("App name must be a single .app filename")
         if not manifest.get("privileged", False) and "install" not in manifest:
             raise LifecycleError("App requires install command")
+        extensions = manifest["app"].get("extensions", [])
+        if not isinstance(extensions, list) or not all(
+                isinstance(e, str) and e.endswith(".appex") and relative_path(e).name == e for e in extensions):
+            raise LifecycleError("App extensions must be .appex names inside Contents/PlugIns")
     if "plugin" in manifest:
         path = relative_path(manifest["plugin"]["path"])
         if not re.fullmatch(r".+\.[0-9]+[smhd]\.[^.]+", path.name) or path.suffix in (".md", ".json", ".txt"):
@@ -347,6 +352,29 @@ class Manager:
             subprocess.run(["/usr/bin/open", "-g", "swiftbar://refreshallplugins"],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
 
+    def app_extensions(self, record, register):
+        """Register (or unregister) an app's bundled extensions, such as a Quick
+        Look preview, once the app sits at its final path."""
+        names = record["manifest"].get("app", {}).get("extensions", [])
+        if not self.system_effects or not names or not record.get("app"):
+            return
+        if self.home != Path.home().resolve():
+            raise LifecycleError("Alternate homes require --no-system-effects")
+        app = Path(record["app"])
+        lsregister = ("/System/Library/Frameworks/CoreServices.framework/Frameworks/"
+                      "LaunchServices.framework/Support/lsregister")
+        quiet = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        if register:
+            subprocess.run([lsregister, "-f", str(app)], **quiet)
+        for name in names:
+            subprocess.run(["/usr/bin/pluginkit", "-a" if register else "-r", str(app / "Contents/PlugIns" / name)], **quiet)
+        if not register:
+            subprocess.run([lsregister, "-u", str(app)], **quiet)
+
+    def refresh_quicklook(self, record):
+        if self.system_effects and record["manifest"].get("app", {}).get("extensions"):
+            subprocess.run(["/usr/bin/qlmanage", "-r"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+
     def install(self, utility_id):
         available = self.manifests()
         if utility_id not in available:
@@ -469,6 +497,8 @@ class Manager:
                 elif receipt_path.exists():
                     receipt_path.unlink()
                 raise
+        self.app_extensions(record, register=True)
+        self.refresh_quicklook(record)
         self.refresh()
         return {"message": "Installed " + manifest["name"] + (". System setup requires the Terminal command shown in the manager." if manifest.get("privileged") else ""),
                 "commands": self.privileged_commands(record)}
@@ -516,6 +546,7 @@ class Manager:
         plugin = Path(record["plugin"]["path"]) if record.get("plugin") else None
         old_link = os.readlink(str(plugin)) if plugin and plugin.is_symlink() else None
         receipt_path = self.receipts / (record["id"] + ".json")
+        self.app_extensions(record, register=False)
         with tempfile.TemporaryDirectory(prefix="remove-", dir=str(self.root)) as work:
             moved = []
             try:
@@ -536,6 +567,7 @@ class Manager:
                     plugin.symlink_to(old_link)
                 atomic_json(receipt_path, record)
                 raise
+        self.refresh_quicklook(record)
         self.refresh()
         return {"message": "Removed managed files; preferences and keys retained"}
 

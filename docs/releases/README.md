@@ -19,7 +19,7 @@ cache="$HOME/.cache/worktrees/mac-utilities/release-path"
 /usr/bin/python3 scripts/release/version_gate.py  # add --tag v1.0.0 after the approved LICENSE exists
 bash scripts/release/test.sh
 /usr/bin/python3 scripts/release/build.py --output "$cache/dist" --scratch "$cache/build"
-MAC_UTILITIES_INSTALL=memory,git-settings,gif-stickers,transcribe \
+MAC_UTILITIES_INSTALL=memory,git-settings,gif-stickers,transcribe,video-preview \
   bash install.sh --artifacts "$cache/dist" --home "$cache/proof-home" --no-system-effects
 bash install.sh --artifacts "$cache/dist" --home "$cache/proof-home" --no-system-effects update --all
 ```
@@ -32,7 +32,7 @@ Terminal and app-opening effects. It never launches apps or invokes their normal
 checkout installers.
 
 The builder packages universal arm64/x86_64 bundles for Mac Utilities, Git & SSH,
-GIF Stickers and Transcribe, checks every architecture and signature, and writes a catalog
+GIF Stickers, Transcribe and Video Preview, checks every architecture and signature, and writes a catalog
 archive of nonprivileged utility payloads. The private/system Travel Router is
 excluded. Transcribe includes its engine sources, pinned requirements and launchd template;
 its release hook installs the engine only when system effects are enabled. The
@@ -52,6 +52,30 @@ isolated home, and uploads them. `workflow_dispatch` only proves/uploads artifac
 it cannot publish. Only an approved existing `v*` tag enables the publish job,
 and the version gate (including matching changelog and approved LICENSE) must pass first. The publish command uses `--verify-tag` so
 it cannot silently create a tag.
+
+### Apps built by their own hook
+
+SwiftPM cannot build app extensions. A utility whose manifest has
+`"release": {"build": "scripts/build.sh"}` is built by that script instead:
+`build.sh --output <stage> --version <x.y.z> --scratch <dir> --license <LICENSE>`
+must write the signed universal app into the stage. Video Preview uses it to
+run `xcodebuild`, embed VLCKit as one flat dylib and sign from the inside out,
+ad hoc. Every app, whichever way it is built, then passes the same checks:
+
+- every Mach-O inside is arm64 + x86_64;
+- the app and extension executables target macOS 14.0, and bundled libraries
+  target no later than that;
+- each extension listed in `app.extensions` is sandboxed;
+- `codesign --verify --deep --strict` passes, `LICENSE` is in Resources, and
+  the identity and version match the manifest.
+
+The symlink ban stays: a versioned `.framework` cannot ship. CI pins Xcode 15.4
+on `macos-14` and caches the VLCKit download (`~/.cache/mac-utilities/vlckit`,
+keyed on `video-preview/scripts/fetch-vlckit.sh`).
+
+`app.extensions` also tells the manager to register those extensions after
+it places the app (`lsregister -f`, `pluginkit -a`, `qlmanage -r`), and to
+unregister them before removal. `--no-system-effects` skips both.
 
 ## Installer interface
 
@@ -92,7 +116,9 @@ Installation is transactional per app/utility, not across the entire collection;
 a later utility failure can leave earlier successful installs in place.
 
 Quarantine removal is opt-in with `--strip-quarantine`; default installation never
-strips it or re-signs downloaded apps. Ad hoc signing does not provide a stable
+strips it or re-signs downloaded apps. A quarantined Video Preview is
+translocated by Gatekeeper and its Quick Look extension is not registered until
+the user allows it (Privacy & Security → Open Anyway). Ad hoc signing does not provide a stable
 privacy identity. See [signing recommendation](signing.md) before deciding how to
 ship permission-sensitive applications.
 

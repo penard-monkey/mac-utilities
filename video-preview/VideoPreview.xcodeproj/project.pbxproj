@@ -1,0 +1,363 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1250F39B968D81E4CC051773 /* VideoPreviewApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 638199110A7015FDB7F31DB9 /* VideoPreviewApp.swift */; };
+		D8BDD25431F839D1E4AC8092 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CE7180D8A6EE74F66F86117 /* ContentView.swift */; };
+		9285D28918F0B5E728AAFBA0 /* ExtensionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F21F4EB4847B14053CCB8D0 /* ExtensionStatus.swift */; };
+		FCF655AD6EA87A0DC6DF8806 /* PreviewViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16359ABC14784DB58AA0C1AD /* PreviewViewController.swift */; };
+		BE3C9602EC29ADB0E69FBEC9 /* VideoPreviewQuickLook.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E602A499817464D797B7C906 /* VideoPreviewQuickLook.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		431387EB7262E1CFC79B125E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 46F86FAA6BBF9AC94A7E4595 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5DC61D677659CB93EE502EBC;
+			remoteInfo = VideoPreviewQuickLook;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		CEE661EFA17BB7F054B3B702 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				BE3C9602EC29ADB0E69FBEC9 /* VideoPreviewQuickLook.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		638199110A7015FDB7F31DB9 /* VideoPreviewApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPreviewApp.swift; sourceTree = "<group>"; };
+		1CE7180D8A6EE74F66F86117 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		8F21F4EB4847B14053CCB8D0 /* ExtensionStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionStatus.swift; sourceTree = "<group>"; };
+		EA893AA2C91A1A117AEA4FFB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		16359ABC14784DB58AA0C1AD /* PreviewViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewViewController.swift; sourceTree = "<group>"; };
+		439FF33EA78C1413E112D40D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		FA2F7E40BEC2EE645CB2D249 /* QuickLookExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = QuickLookExtension.entitlements; sourceTree = "<group>"; };
+		F91288DB192297DC903FE08C /* Video Preview.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Video Preview.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E602A499817464D797B7C906 /* VideoPreviewQuickLook.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VideoPreviewQuickLook.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		44404C2D60CD3F32FCB6EADB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		58198AE59290A27C67A68517 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4EAE695AD1F489F78EA3E1C6 = {
+			isa = PBXGroup;
+			children = (
+				D36540CDAA07DF7F5828251E /* App */,
+				7D14D22A259683439E57729B /* QuickLookExtension */,
+				1D5F545FBA1B7116946BB4C6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D36540CDAA07DF7F5828251E /* App */ = {
+			isa = PBXGroup;
+			children = (
+				638199110A7015FDB7F31DB9 /* VideoPreviewApp.swift */,
+				1CE7180D8A6EE74F66F86117 /* ContentView.swift */,
+				8F21F4EB4847B14053CCB8D0 /* ExtensionStatus.swift */,
+				EA893AA2C91A1A117AEA4FFB /* Info.plist */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		7D14D22A259683439E57729B /* QuickLookExtension */ = {
+			isa = PBXGroup;
+			children = (
+				16359ABC14784DB58AA0C1AD /* PreviewViewController.swift */,
+				439FF33EA78C1413E112D40D /* Info.plist */,
+				FA2F7E40BEC2EE645CB2D249 /* QuickLookExtension.entitlements */,
+			);
+			path = QuickLookExtension;
+			sourceTree = "<group>";
+		};
+		1D5F545FBA1B7116946BB4C6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F91288DB192297DC903FE08C /* Video Preview.app */,
+				E602A499817464D797B7C906 /* VideoPreviewQuickLook.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		ACC9652797AB670E77D9DAEA /* VideoPreview */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 84AA496B28FF4773D87FA72F;
+			buildPhases = (
+				F527A901ABA44A9BCB7F2DAB /* Sources */,
+				44404C2D60CD3F32FCB6EADB /* Frameworks */,
+				77E618D7248D63888B368379 /* Resources */,
+				CEE661EFA17BB7F054B3B702 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2254342BECCEAFBD04538E0A /* PBXTargetDependency */,
+			);
+			name = VideoPreview;
+			productName = VideoPreview;
+			productReference = F91288DB192297DC903FE08C /* Video Preview.app */;
+			productType = "com.apple.product-type.application";
+		};
+		5DC61D677659CB93EE502EBC /* VideoPreviewQuickLook */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 882ADF0EF44090269D1C5C4F;
+			buildPhases = (
+				1C453A529C6ABEA7CEF4D6AC /* Sources */,
+				58198AE59290A27C67A68517 /* Frameworks */,
+				93192F04646351897137D295 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VideoPreviewQuickLook;
+			productName = VideoPreviewQuickLook;
+			productReference = E602A499817464D797B7C906 /* VideoPreviewQuickLook.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		46F86FAA6BBF9AC94A7E4595 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1540;
+				LastUpgradeCheck = 1540;
+			};
+			buildConfigurationList = 4DC842AFD6F1146FD0D47CEA;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 4EAE695AD1F489F78EA3E1C6;
+			productRefGroup = 1D5F545FBA1B7116946BB4C6 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				ACC9652797AB670E77D9DAEA /* VideoPreview */,
+				5DC61D677659CB93EE502EBC /* VideoPreviewQuickLook */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		77E618D7248D63888B368379 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		93192F04646351897137D295 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		F527A901ABA44A9BCB7F2DAB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1250F39B968D81E4CC051773 /* VideoPreviewApp.swift in Sources */,
+				D8BDD25431F839D1E4AC8092 /* ContentView.swift in Sources */,
+				9285D28918F0B5E728AAFBA0 /* ExtensionStatus.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1C453A529C6ABEA7CEF4D6AC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FCF655AD6EA87A0DC6DF8806 /* PreviewViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		2254342BECCEAFBD04538E0A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5DC61D677659CB93EE502EBC /* VideoPreviewQuickLook */;
+			targetProxy = 431387EB7262E1CFC79B125E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		80DB6ACE13380ADC3D86D6C5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APP_BUNDLE_ID = com.mac-utilities.video-preview;
+				APP_PRODUCT_NAME = "Video Preview";
+				ARCHS = "$(ARCHS_STANDARD)";
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1.0.0;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				VLCKIT_DIR = "$(PROJECT_DIR)/Vendor";
+			};
+			name = Debug;
+		};
+		08723DE70035A45CE7E33CC1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APP_BUNDLE_ID = com.mac-utilities.video-preview;
+				APP_PRODUCT_NAME = "Video Preview";
+				ARCHS = "$(ARCHS_STANDARD)";
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1.0.0;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0.0;
+				ONLY_ACTIVE_ARCH = NO;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				VLCKIT_DIR = "$(PROJECT_DIR)/Vendor";
+			};
+			name = Release;
+		};
+		98E398162C206F89866DBAA5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID)";
+				PRODUCT_NAME = "$(APP_PRODUCT_NAME)";
+			};
+			name = Debug;
+		};
+		31F573C1C1732BCE6B7B4EEB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID)";
+				PRODUCT_NAME = "$(APP_PRODUCT_NAME)";
+			};
+			name = Release;
+		};
+		61A8FE553262CD7EB776D383 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				FRAMEWORK_SEARCH_PATHS = "$(VLCKIT_DIR)";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = QuickLookExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				OTHER_LDFLAGS = (
+					"-framework",
+					VLCKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).quicklook";
+				PRODUCT_NAME = VideoPreviewQuickLook;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		7C80754A03446383EF99BF62 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				FRAMEWORK_SEARCH_PATHS = "$(VLCKIT_DIR)";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = QuickLookExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				OTHER_LDFLAGS = (
+					"-framework",
+					VLCKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).quicklook";
+				PRODUCT_NAME = VideoPreviewQuickLook;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4DC842AFD6F1146FD0D47CEA = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				80DB6ACE13380ADC3D86D6C5 /* Debug */,
+				08723DE70035A45CE7E33CC1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		84AA496B28FF4773D87FA72F = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				98E398162C206F89866DBAA5 /* Debug */,
+				31F573C1C1732BCE6B7B4EEB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		882ADF0EF44090269D1C5C4F = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				61A8FE553262CD7EB776D383 /* Debug */,
+				7C80754A03446383EF99BF62 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 46F86FAA6BBF9AC94A7E4595 /* Project object */;
+}
