@@ -1,0 +1,368 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A1000000000000000000B001 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000F001 /* main.swift */; };
+		A1000000000000000000B002 /* PreviewViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000F004 /* PreviewViewController.swift */; };
+		A1000000000000000000B003 /* VLCKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A1000000000000000000F007 /* VLCKit.framework */; };
+		A1000000000000000000B004 /* VLCKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A1000000000000000000F007 /* VLCKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		A1000000000000000000B005 /* VideoPreviewSpikePreview.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A1000000000000000000F009 /* VideoPreviewSpikePreview.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A1000000000000000000C001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A1000000000000000000P001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A1000000000000000000T002;
+			remoteInfo = VideoPreviewSpikePreview;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A1000000000000000000E001 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A1000000000000000000B005 /* VideoPreviewSpikePreview.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000000000000000000E002 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				A1000000000000000000B004 /* VLCKit.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		A1000000000000000000F001 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		A1000000000000000000F002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1000000000000000000F003 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		A1000000000000000000F004 /* PreviewViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewViewController.swift; sourceTree = "<group>"; };
+		A1000000000000000000F005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1000000000000000000F006 /* PreviewExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PreviewExtension.entitlements; sourceTree = "<group>"; };
+		A1000000000000000000F007 /* VLCKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = Vendor/VLCKit.framework; sourceTree = SOURCE_ROOT; };
+		A1000000000000000000F008 /* Video Preview Spike.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Video Preview Spike.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1000000000000000000F009 /* VideoPreviewSpikePreview.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VideoPreviewSpikePreview.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A1000000000000000000W001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000000000000000000W002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000000000000000000B003 /* VLCKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A1000000000000000000G000 = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000G001 /* App */,
+				A1000000000000000000G002 /* PreviewExtension */,
+				A1000000000000000000G003 /* Frameworks */,
+				A1000000000000000000G004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A1000000000000000000G001 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000F001 /* main.swift */,
+				A1000000000000000000F002 /* Info.plist */,
+				A1000000000000000000F003 /* App.entitlements */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000G002 /* PreviewExtension */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000F004 /* PreviewViewController.swift */,
+				A1000000000000000000F005 /* Info.plist */,
+				A1000000000000000000F006 /* PreviewExtension.entitlements */,
+			);
+			path = PreviewExtension;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000G003 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000F007 /* VLCKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000G004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000F008 /* Video Preview Spike.app */,
+				A1000000000000000000F009 /* VideoPreviewSpikePreview.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A1000000000000000000T001 /* VideoPreviewSpike */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1000000000000000000L002 /* Build configuration list for PBXNativeTarget "VideoPreviewSpike" */;
+			buildPhases = (
+				A1000000000000000000S001 /* Sources */,
+				A1000000000000000000W001 /* Frameworks */,
+				A1000000000000000000R001 /* Resources */,
+				A1000000000000000000E001 /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A1000000000000000000D001 /* PBXTargetDependency */,
+			);
+			name = VideoPreviewSpike;
+			productName = VideoPreviewSpike;
+			productReference = A1000000000000000000F008 /* Video Preview Spike.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A1000000000000000000T002 /* VideoPreviewSpikePreview */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1000000000000000000L003 /* Build configuration list for PBXNativeTarget "VideoPreviewSpikePreview" */;
+			buildPhases = (
+				A1000000000000000000S002 /* Sources */,
+				A1000000000000000000W002 /* Frameworks */,
+				A1000000000000000000R002 /* Resources */,
+				A1000000000000000000E002 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VideoPreviewSpikePreview;
+			productName = VideoPreviewSpikePreview;
+			productReference = A1000000000000000000F009 /* VideoPreviewSpikePreview.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A1000000000000000000P001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+			};
+			buildConfigurationList = A1000000000000000000L001 /* Build configuration list for PBXProject "VideoPreviewSpike" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A1000000000000000000G000;
+			productRefGroup = A1000000000000000000G004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A1000000000000000000T001 /* VideoPreviewSpike */,
+				A1000000000000000000T002 /* VideoPreviewSpikePreview */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A1000000000000000000R001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000000000000000000R002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A1000000000000000000S001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000000000000000000B001 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000000000000000000S002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000000000000000000B002 /* PreviewViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A1000000000000000000D001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A1000000000000000000T002 /* VideoPreviewSpikePreview */;
+			targetProxy = A1000000000000000000C001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		A1000000000000000000X001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD)";
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A1000000000000000000X002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD)";
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				ONLY_ACTIVE_ARCH = NO;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		A1000000000000000000X003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mac-utilities.video-preview-spike";
+				PRODUCT_NAME = "Video Preview Spike";
+			};
+			name = Debug;
+		};
+		A1000000000000000000X004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mac-utilities.video-preview-spike";
+				PRODUCT_NAME = "Video Preview Spike";
+			};
+			name = Release;
+		};
+		A1000000000000000000X005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = PreviewExtension/PreviewExtension.entitlements;
+				FRAMEWORK_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PreviewExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks @executable_path/../../../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mac-utilities.video-preview-spike.preview";
+				PRODUCT_NAME = VideoPreviewSpikePreview;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		A1000000000000000000X006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = PreviewExtension/PreviewExtension.entitlements;
+				FRAMEWORK_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PreviewExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks @executable_path/../../../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mac-utilities.video-preview-spike.preview";
+				PRODUCT_NAME = VideoPreviewSpikePreview;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A1000000000000000000L001 /* Build configuration list for PBXProject "VideoPreviewSpike" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000000000000000000X001 /* Debug */,
+				A1000000000000000000X002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1000000000000000000L002 /* Build configuration list for PBXNativeTarget "VideoPreviewSpike" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000000000000000000X003 /* Debug */,
+				A1000000000000000000X004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1000000000000000000L003 /* Build configuration list for PBXNativeTarget "VideoPreviewSpikePreview" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000000000000000000X005 /* Debug */,
+				A1000000000000000000X006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A1000000000000000000P001 /* Project object */;
+}
