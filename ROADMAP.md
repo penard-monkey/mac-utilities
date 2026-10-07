@@ -5,6 +5,25 @@ the session summary that spawned it (see docs/sessions/). Groomed during the
 close-out ritual (global `/close-out` skill; this repo's settings in
 `.claude/close-out.md`).
 
+## QR Reader
+
+Shipped in 1.5.0 without these checks; the user chose to exercise them live
+after the release rather than keep testing a dev build. Each one is a real gap,
+not a formality.
+
+- **Region-scan decode.** One drag over a QR on screen returned "No code found"
+  while the Screen Recording grant was present and the capture wrote a file, so
+  it is either a blanked capture or a decode miss — cause unknown. Everything
+  either side of the `screencapture` call is proven. Reproduce it with the
+  release build before trusting region scanning.
+- **Image-file input.** `--scan=file` and the picker have never been run by hand.
+- **The refusal paths, by hand.** `otpauth:` staying masked and never opening,
+  and `javascript:` being refused, are covered by unit tests but have not been
+  seen on screen. These are the cases where a bug is worst.
+- **The SwiftBar hotkey.** The plugin's output is verified by running it
+  directly; whether SwiftBar registers `shortcut=CMD+SHIFT+9` as a global hotkey
+  is untested, because testing it meant touching the live `~/.swiftbar` folder.
+
 ## Releases and updates
 
 - **Confirm an update from the manager window.** v1.0.1 was the first real

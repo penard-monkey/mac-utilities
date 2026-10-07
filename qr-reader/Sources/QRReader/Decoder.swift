@@ -50,9 +50,10 @@ enum Decoder {
 
         return observations.compactMap { observation in
             if let text = observation.payloadStringValue, !text.isEmpty { return .text(text) }
-            if #available(macOS 15.0, *), let data = observation.payloadData, !data.isEmpty {
-                return .bytes(data)
-            }
+            // payloadData is API_AVAILABLE(macos(14.0)), i.e. available on every
+            // version this app supports — no availability guard, or binary
+            // payloads would silently read as "no code found" on macOS 14.
+            if let data = observation.payloadData, !data.isEmpty { return .bytes(data) }
             return nil
         }
     }

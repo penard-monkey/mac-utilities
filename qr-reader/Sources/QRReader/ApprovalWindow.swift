@@ -15,7 +15,7 @@ final class ApprovalWindowController: NSObject, NSWindowDelegate {
 
     private let verdict: Verdict
     private let settings: Settings
-    private let panel: NSPanel
+    private let panel: DenyingPanel
     private var decision: ApprovalDecision = .cancelled
     private var detailsStack: NSStackView?
     private var redirectLabel: NSTextField?
@@ -29,9 +29,10 @@ final class ApprovalWindowController: NSObject, NSWindowDelegate {
     private init(verdict: Verdict, settings: Settings) {
         self.verdict = verdict
         self.settings = settings
-        panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 520, height: 200),
-                        styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        panel = DenyingPanel(contentRect: NSRect(x: 0, y: 0, width: 520, height: 200),
+                             styleMask: [.titled, .closable], backing: .buffered, defer: false)
         super.init()
+        panel.onCancel = { [weak self] in self?.cancel() }
         panel.delegate = self
         panel.title = "QR Reader"
         panel.isFloatingPanel = true
@@ -260,9 +261,11 @@ final class ApprovalWindowController: NSObject, NSWindowDelegate {
 
         let cancel = NSButton(title: "Cancel", target: self, action: #selector(cancel))
         cancel.bezelStyle = .rounded
-        cancel.keyEquivalent = "\u{1b}"
+        // Return denies. Escape also denies, via DenyingPanel. Focus starts
+        // here, so a stray Space cannot press Open.
+        cancel.keyEquivalent = "\r"
         row.addView(cancel, in: .leading)
-        panel.defaultButtonCell = cancel.cell as? NSButtonCell
+        panel.initialFirstResponder = cancel
         return row
     }
 
@@ -306,8 +309,8 @@ final class ApprovalWindowController: NSObject, NSWindowDelegate {
 
     private func confirmHandoff() -> Bool {
         let scheme = (verdict.openURL?.scheme ?? "unknown") + ":"
-        let confirm = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 140),
-                              styleMask: [.titled], backing: .buffered, defer: false)
+        let confirm = DenyingPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 140),
+                                   styleMask: [.titled], backing: .buffered, defer: false)
         confirm.title = "Confirm handoff"
         var allowed = false
 
@@ -330,7 +333,7 @@ final class ApprovalWindowController: NSObject, NSWindowDelegate {
         go.keyEquivalent = ""
         let back = NSButton(title: "Back", target: nil, action: nil)
         back.bezelStyle = .rounded
-        back.keyEquivalent = "\u{1b}"
+        back.keyEquivalent = "\r"
 
         let handler = ButtonHandler { isGo in
             allowed = isGo
@@ -344,6 +347,8 @@ final class ApprovalWindowController: NSObject, NSWindowDelegate {
 
         confirm.contentView = stack
         confirm.setContentSize(stack.fittingSize)
+        confirm.initialFirstResponder = back
+        confirm.onCancel = { allowed = false; NSApp.stopModal() }
         confirm.center()
         NSApp.runModal(for: confirm)
         confirm.orderOut(nil)

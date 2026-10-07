@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import QRReaderCore
 import UniformTypeIdentifiers
 
 enum CaptureSource {
@@ -82,10 +83,15 @@ enum CaptureService {
         let message = String(data: errors.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
 
         guard FileManager.default.fileExists(atPath: target.path) else {
-            // Escape during selection exits non-zero and writes nothing.
-            if task.terminationStatus != 0 && message.isEmpty { throw CaptureError.cancelled }
-            throw message.isEmpty ? CaptureError.cancelled
-                                  : CaptureError.captureFailed(message.trimmingCharacters(in: .whitespacesAndNewlines))
+            // Escape during selection exits non-zero and writes nothing at all.
+            if message.isEmpty { throw CaptureError.cancelled }
+            // A grant that preflighted as present can still be ineffective —
+            // after an update, every time. Send that to the permission window
+            // rather than showing someone "status 1".
+            if CaptureDiagnosis.isPermissionDenial(status: task.terminationStatus, stderr: message) {
+                throw CaptureError.screenRecordingDenied
+            }
+            throw CaptureError.captureFailed(message.trimmingCharacters(in: .whitespacesAndNewlines))
         }
         guard let source = CGImageSourceCreateWithURL(target as CFURL, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {

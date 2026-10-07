@@ -48,8 +48,8 @@ enum Dialogs {
     /// Returns the index of the button clicked, or nil if the window was closed.
     private static func choose(title: String, message: String, buttons: [String],
                                cancelIndex: Int, vertical: Bool = false) -> Int? {
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 460, height: 160),
-                            styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let panel = DenyingPanel(contentRect: NSRect(x: 0, y: 0, width: 460, height: 160),
+                                 styleMask: [.titled, .closable], backing: .buffered, defer: false)
         panel.title = "QR Reader"
         panel.isFloatingPanel = true
 
@@ -58,6 +58,7 @@ enum Dialogs {
             result = index
             NSApp.stopModal()
         }
+        panel.onCancel = { result = cancelIndex; NSApp.stopModal() }
 
         let stack = NSStackView()
         stack.orientation = .vertical
@@ -82,8 +83,10 @@ enum Dialogs {
             let button = NSButton(title: label, target: handler, action: #selector(IndexHandler.clicked(_:)))
             button.bezelStyle = .rounded
             button.tag = index
-            // Only ever the cancelling button answers to Return or Escape.
-            button.keyEquivalent = index == cancelIndex ? "\u{1b}" : ""
+            // Only ever the cancelling button answers to Return; Escape is the
+            // panel's, so both keys land on the same harmless choice.
+            button.keyEquivalent = index == cancelIndex ? "\r" : ""
+            if index == cancelIndex { panel.initialFirstResponder = button }
             row.addView(button, in: .leading)
         }
         stack.addView(row, in: .leading)

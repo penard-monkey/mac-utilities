@@ -253,3 +253,21 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(Settings.load(from: url), settings)
     }
 }
+
+final class CaptureDiagnosisTests: XCTestCase {
+    func testScreencaptureDenialMessagesAreRecognised() {
+        // The exact strings screencapture produces when the grant is missing
+        // or no longer effective. Someone hitting this after an update must get
+        // the permission window, not "status 1".
+        XCTAssertTrue(CaptureDiagnosis.isPermissionDenial(status: 1, stderr: "could not create image from display\n"))
+        XCTAssertTrue(CaptureDiagnosis.isPermissionDenial(status: 1, stderr: "could not create image from rect"))
+        XCTAssertTrue(CaptureDiagnosis.isPermissionDenial(status: 1, stderr: "Not authorized to capture the screen"))
+    }
+
+    func testSuccessAndOtherFailuresAreNotTreatedAsDenial() {
+        XCTAssertFalse(CaptureDiagnosis.isPermissionDenial(status: 0, stderr: ""))
+        XCTAssertFalse(CaptureDiagnosis.isPermissionDenial(status: 0, stderr: "could not create image from display"))
+        XCTAssertFalse(CaptureDiagnosis.isPermissionDenial(status: 1, stderr: "no such file or directory"))
+        XCTAssertFalse(CaptureDiagnosis.isPermissionDenial(status: 1, stderr: ""))
+    }
+}

@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.5.0]
+
+- New utility, **QR Reader** 1.0.0: drag a box around a QR code on screen and
+  see exactly what it would do before anything happens. The approval window
+  shows the payload in full, with the host highlighted, and lists what is wrong
+  with it — credentials before the host (`https://apple.com@evil.tld/`),
+  punycode shown decoded, mixed alphabets, invisible or direction-changing
+  characters, `%00`, known shorteners, cleartext `http`, raw IP hosts and odd
+  ports. Cancel is the default, Escape and closing the window deny, and nothing
+  is ever on a timer.
+- QR Reader never opens `otpauth:` (the secret is masked on screen and redacted
+  in history), `javascript:`, `data:`, `file:`, `vbscript:` or `about:`. Any
+  other scheme costs a second confirmation. Wi-Fi codes are shown, not joined.
+- Scan from a screen region, the clipboard or an image file. Clipboard and file
+  scans need no permission; region scans need Screen Recording, which macOS
+  fails silently without, so the app checks and asks for it explicitly.
+- Scan history is redacted before it is written (Wi-Fi passwords, OTP secrets,
+  URL userinfo, credential-ish query parameters), kept at mode 600, newest 100,
+  and the last five show in the menu bar item.
+
 ## [1.4.0]
 
 - New utility, **Video Preview**: press Space in Finder to play MKV, WebM,

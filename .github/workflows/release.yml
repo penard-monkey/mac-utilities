@@ -31,7 +31,7 @@ jobs:
         run: /usr/bin/python3 scripts/release/build.py --output "$RUNNER_TEMP/dist" --scratch "$RUNNER_TEMP/build"
       - name: Prove installer against actual artifacts in an isolated home
         env:
-          MAC_UTILITIES_INSTALL: memory,git-settings,gif-stickers,transcribe,video-preview
+          MAC_UTILITIES_INSTALL: memory,git-settings,gif-stickers,transcribe,video-preview,qr-reader
         run: |
           /bin/bash install.sh --artifacts "$RUNNER_TEMP/dist" --home "$RUNNER_TEMP/proof-home" --no-system-effects
           /bin/bash install.sh --artifacts "$RUNNER_TEMP/dist" --home "$RUNNER_TEMP/proof-home" --no-system-effects update --all

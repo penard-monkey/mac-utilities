@@ -66,9 +66,18 @@ selection just never produces a code. So QR Reader checks first
 Privacy & Security › Screen & System Audio Recording and the clipboard route,
 which needs no permission at all. The menu bar item shows the last known state.
 
-The app is signed ad hoc, so **its signature changes every time it is rebuilt**.
-macOS may therefore ask for Screen Recording again after an update. That is
-expected, not a bug.
+**Expect to re-grant it after an update.** The app is signed ad hoc, so every
+build is a new signing identity, and macOS ties a privacy grant to that identity.
+This was measured, not assumed: rebuilding the app with nothing else changed —
+same bundle id, same path — revoked a working grant.
+Updating QR Reader can therefore cost you one click in System Settings again.
+That is a deliberate trade — the alternative is a paid or self-managed signing
+certificate — and it is written down in `docs/releases/signing.md`.
+
+It is bounded on purpose: nothing else about the app depends on that grant.
+**Decode Clipboard and image files keep working with no permission at all**, and
+the menu bar item tells you when the grant is missing instead of silently doing
+nothing.
 
 ## History
 

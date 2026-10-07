@@ -87,7 +87,10 @@ DECISION_MARK = {"opened": "↗", "copied": "⧉", "cancelled": "✕", "refused"
 
 def main():
     state = read_state()
-    installed = os.path.isdir(APP_PATH) or state.get("bundle_path")
+    # A state file left behind by an app that is gone must not claim it is
+    # installed, or the menu offers actions that silently do nothing.
+    recorded = state.get("bundle_path")
+    installed = os.path.isdir(APP_PATH) or (recorded and os.path.isdir(recorded))
 
     print(" | sfimage=qrcode.viewfinder")
     print("---")

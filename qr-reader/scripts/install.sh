@@ -34,8 +34,7 @@ APP="$STAGE/$APP_NAME"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/QRReader" "$APP/Contents/MacOS/QRReader"
 cp "$ROOT/Info.plist" "$APP/Contents/Info.plist"
-/usr/bin/swift "$ROOT/scripts/make-icon.swift" "$STAGE/AppIcon.iconset"
-/usr/bin/iconutil -c icns "$STAGE/AppIcon.iconset" -o "$APP/Contents/Resources/AppIcon.icns"
+cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
 # Ad-hoc signing gives the bundle a stable identifier but a fresh cdhash on
 # every build, so macOS may ask for Screen Recording again after an update.

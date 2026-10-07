@@ -6,6 +6,22 @@ by local builds and CI. Treat that as a proposal requiring the user's decision;
 this branch does not create/import certificates or change signing secrets. The
 artifact builder currently uses ad hoc signing, as today's local installers do.
 
+**Decision (2026-10-07, QR Reader 1.0.0 / release 1.5.0): stay on ad hoc, and
+accept the consequence.** QR Reader is the first utility here that needs a TCC
+grant (Screen Recording), so it is the first to feel this. The accepted cost is
+that **macOS may ask for Screen Recording again after every QR Reader update**,
+because each build is a new ad hoc identity. No certificates are created or
+imported. **This is now measured on this Mac, not inferred.** On 2026-10-07, QR Reader's
+dev build held Screen Recording (`CGPreflightScreenCaptureAccess()` true, a
+capture in flight). It was then rebuilt with no other change — same bundle
+identifier, same path, same app name, same ad hoc signing — and the grant was
+gone: preflight false, and `screencapture` exited 1 with "could not create image
+from display". A rebuild alone revoked it. Expect one re-grant per QR Reader
+update until a persistent signing identity is adopted. QR
+Reader is built so the cost is bounded — it detects the denial, asks for the
+permission explicitly, and its clipboard and image-file scans need no permission
+at all, so the app keeps working while a grant is missing.
+
 macOS privacy permission continuity follows the app's **designated requirement**
 (DR). Apple explicitly describes microphone permissions being stored against the
 DR and checked when an updated app accesses the microphone. An ad hoc signature
