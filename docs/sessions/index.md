@@ -10,6 +10,7 @@ are archived beside its summary as `planning.tar.gz`.
 
 | Date | Session |
 | --- | --- |
+| 2026-10-07 | [QR Reader](2026-10-07-qr-reader/summary.md): scan a QR code from the screen, clipboard or a file and approve before anything opens; measured that an ad-hoc rebuild revokes Screen Recording, and shipped with region scanning to be verified live |
 | 2026-10-06 | [Video Preview](2026-10-06-video-preview/summary.md): Quick Look playback for MKV, WebM, AVI, FLV and WMV on VideoLAN's VLCKit, after a spike proved an ad-hoc-signed sandboxed extension loads; VLCKit ships as a flat dylib because release archives refuse symlinks |
 | 2026-10-04 | [GIF Stickers still images and cut-out](2026-10-04-gif-stickers-images/summary.md): stickers from PNG/JPEG/HEIC/TIFF/WebP with an on-device Vision subject cut-out; static stickers need `cwebp` because `img2webp` wraps one frame in an animation container, and Vision cannot run on GitHub's virtual runners |
 | 2026-10-04 | [GIF Stickers Add to Library and rename](2026-10-04-gif-stickers-add-rename/summary.md): export became a dialog-free Add to Library with safe, non-overwriting names, and stickers can be renamed; the filename is the name, groundwork for search |
