@@ -34,11 +34,6 @@ not a formality.
   See `docs/releases/signing.md`.
   ([session](docs/sessions/2026-10-04-releases-and-public-cutover/summary.md))
 
-## QR Reader
-
-- **Click-test, then PR.** Built locally with ten test codes; never pushed. Add
-  it to release verification once merged.
-
 ## Transcribe
 
 - **Speaker labels.** Dropped for v1 to avoid torch; would need pyannote.
