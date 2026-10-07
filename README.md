@@ -7,6 +7,7 @@ Small, independent tools for this Mac, with a shared installer and Tools menu.
 | [Mac Utilities](utilities-manager/) | Tools → Manage Utilities… | Install, update, remove and show/hide individual utilities |
 | [Git & SSH](git-settings/) | Tools → Git & SSH | Machine-level Git settings, SSH keys/hosts, backups and connection diagnostics |
 | [GIF Stickers](gif-stickers/) | Tools → GIF Stickers | Native GIF cropping and WebP sticker export |
+| [QR Reader](qr-reader/) | Tools → QR Reader, own menu-bar item | Scan a QR code off the screen, see exactly what it would open, approve or deny |
 | [Memory](swiftbar/memory/) | Own menu-bar item | Memory usage and pressure, with configurable looks |
 | [Transcribe](transcribe/) | Tools → Transcribe, own menu-bar item | Local audio/video transcription (mlx-whisper), saved next to the file; `transcribe` command |
 | [Video Preview](video-preview/) | Finder Quick Look (Space) | Plays MKV, WebM, AVI, FLV and WMV videos with sound in Quick Look (VLCKit) |
