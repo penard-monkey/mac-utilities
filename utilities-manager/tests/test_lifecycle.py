@@ -57,6 +57,24 @@ class LifecycleTests(unittest.TestCase):
         (source / "mac-utility.json").write_text(json.dumps(manifest))
         return source, manifest
 
+    def test_catalog_update_available_only_when_catalog_is_strictly_newer(self):
+        source, manifest = self.utility()
+        def flag():
+            return next(e for e in self.manager.catalog() if e["id"] == "memory")["update_available"]
+        self.assertFalse(flag())  # available but not installed
+        self.manager.install("memory")
+        self.assertFalse(flag())  # equal
+        for version, expected in (("1.0.1", True), ("1.10.0", True), ("0.9.9", False)):
+            manifest["version"] = version
+            (source / "mac-utility.json").write_text(json.dumps(manifest))
+            self.assertEqual(flag(), expected, version)
+        manifest["version"] = "1.0.0"
+        (source / "mac-utility.json").write_text(json.dumps(manifest))
+        self.assertFalse(flag())
+        # Installed but gone from the catalog: nothing to update to.
+        (source / "mac-utility.json").unlink()
+        self.assertFalse(flag())
+
     def test_plugin_stable_install_update_visibility_uninstall_preserves_preferences(self):
         source, manifest = self.utility()
         prefs = self.manager.config / "memory.json"

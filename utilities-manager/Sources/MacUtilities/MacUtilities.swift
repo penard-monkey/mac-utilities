@@ -13,6 +13,7 @@ struct Utility: Decodable, Identifiable {
     let issue: String?
     let version: String?
     let availableVersion: String?
+    let updateAvailable: Bool
     let presentation: String
     let visible: Bool
     let app: String?
@@ -26,6 +27,7 @@ struct Utility: Decodable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id, name, description, available, source, installed, healthy, issue, version
         case availableVersion = "available_version"
+        case updateAvailable = "update_available"
         case presentation, visible, app, privileged, commands
         case systemDetected = "system_detected"
         case legacyPlugin = "legacy_plugin"
@@ -58,9 +60,14 @@ struct UtilityUpdate: Decodable, Identifiable {
     let current: String?
     let latest: String?
     let available: Bool
+    let updateAvailable: Bool
     let healthy: Bool
     let external: Bool
     let issue: String?
+    enum CodingKeys: String, CodingKey {
+        case id, name, current, latest, available, healthy, external, issue
+        case updateAvailable = "update_available"
+    }
 }
 struct ReleaseStatus: Decodable {
     let current: String?
@@ -71,6 +78,11 @@ struct ReleaseStatus: Decodable {
         case current, latest, utilities
         case managerUpdate = "manager_update"
     }
+    var pendingUtilities: [UtilityUpdate] { utilities.filter(\.updateAvailable) }
+    var currentUtilities: [UtilityUpdate] { utilities.filter { !$0.updateAvailable } }
+    /// Everything an "update all" would install: each newer utility plus the manager itself.
+    var updateCount: Int { pendingUtilities.count + (managerUpdate ? 1 : 0) }
+    var latestVersion: String { latest.hasPrefix("v") ? String(latest.dropFirst()) : latest }
 }
 struct BackendFailure: LocalizedError {
     let message: String
@@ -254,6 +266,7 @@ final class ManagerModel: ObservableObject {
         guard !busy else { return }
         busy = true
         updateError = nil
+        var relaunching = false
         defer { busy = false }
         do {
             let arguments = try releaseArguments() + ["update", id ?? "--all"]
@@ -264,7 +277,8 @@ final class ManagerModel: ObservableObject {
             if let catalog = saved?["source"] as? String { source = catalog }
             try await loadCatalog()
             releaseStatus = nil
-            if result?["relaunch"] as? Bool == true, !isolated {
+            relaunching = result?["relaunch"] as? Bool == true && !isolated
+            if relaunching {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
                 process.arguments = ["-n", Bundle.main.bundleURL.path]
@@ -276,6 +290,10 @@ final class ManagerModel: ObservableObject {
         } catch {
             updateError = error.localizedDescription
             self.error = error.localizedDescription
+        }
+        if !relaunching {
+            busy = false
+            await checkUpdates()
         }
     }
 
@@ -364,9 +382,12 @@ struct UtilityRow: View {
                         Button("Open app") { Task { await model.perform("open", utility: utility) } }
                             .disabled(!utility.healthy)
                     }
+                    if utility.updateAvailable {
                     Button("Update") { Task { await model.perform("update", utility: utility) } }
-                        .disabled(!utility.available || !utility.healthy)
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!utility.healthy)
                         .help(model.releaseMode && utility.source == model.source ? "Update from the latest verified release" : "Update from this folder, retaining settings and menu visibility")
+                    }
                     if utility.privileged {
                         Button("System commands") { model.message = "Copy the setup or removal command below and run it in Terminal. Administrator access is required." }
                     } else {
@@ -423,77 +444,137 @@ struct UtilityRow: View {
     }
 }
 
-struct UpdatesView: View {
+struct UpdateRow: View {
+    let title: String
+    let detail: String
+    var note: String?
+    var issue: String?
+    var current: Bool
+    var buttonTitle: String
+    var action: () -> Void
+    var enabled = true
+
+    var body: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title).font(.headline)
+                if current {
+                    Label(detail, systemImage: issue == nil ? "checkmark.circle.fill" : "exclamationmark.triangle")
+                        .font(.callout).foregroundStyle(issue == nil ? Color.green : Color.orange)
+                } else {
+                    Text(detail).font(.callout.monospacedDigit()).foregroundStyle(.primary)
+                }
+                if let note { Text(note).font(.caption).foregroundStyle(.secondary) }
+                if let issue { Text(issue).font(.caption).foregroundStyle(.orange).textSelection(.enabled) }
+            }
+            Spacer()
+            if !current {
+                Button(buttonTitle, action: action).buttonStyle(.borderedProminent).disabled(!enabled)
+            }
+        }.padding(14).background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+struct UpdatesContent: View {
     @ObservedObject var model: ManagerModel
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Updates").font(.largeTitle.bold())
-                        Text("Mac Utilities \(model.currentVersion)").foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    if model.busy { ProgressView().controlSize(.small) }
-                    Button("Check for updates") { Task { await model.checkUpdates() } }.disabled(model.busy)
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Updates").font(.largeTitle.bold())
+                    Text("Mac Utilities \(model.currentVersion)").foregroundStyle(.secondary)
                 }
-                if let error = model.updateError {
-                    Label(error, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.orange).textSelection(.enabled)
-                }
-                if let message = model.message {
-                    Text(message).font(.callout).textSelection(.enabled)
-                }
-                if let status = model.releaseStatus {
-                    GroupBox("Mac Utilities") {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Installed: \(status.current ?? model.currentVersion)")
-                                Text("Latest release: \(status.latest)").foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if status.managerUpdate {
-                                Button("Update manager & relaunch") { Task { await model.updateRelease(id: "manager") } }
-                                    .buttonStyle(.borderedProminent)
-                            } else { Label("Up to date", systemImage: "checkmark.circle").foregroundStyle(.green) }
-                        }.padding(10)
+                Spacer()
+                if model.busy { ProgressView().controlSize(.small) }
+                Button("Check for updates") { Task { await model.checkUpdates() } }.disabled(model.busy)
+            }
+            if let error = model.updateError {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange).textSelection(.enabled)
+            }
+            if let message = model.message {
+                Text(message).font(.callout).textSelection(.enabled)
+            }
+            if let status = model.releaseStatus {
+                summary(status)
+                if status.updateCount > 0 {
+                    Text("Updates available").font(.title2.bold())
+                    if status.managerUpdate {
+                        UpdateRow(title: "Mac Utilities", detail: "\(status.current ?? model.currentVersion) → \(status.latestVersion)",
+                                  note: "Updates from the release catalog", current: false,
+                                  buttonTitle: "Update & relaunch") { Task { await model.updateRelease(id: "manager") } }
                     }
-                    HStack {
-                        Text("Installed utilities").font(.title2.bold())
-                        Spacer()
-                        Button("Update all & relaunch") { Task { await model.updateRelease() } }
-                            .disabled(status.utilities.contains { !$0.healthy })
+                    ForEach(status.pendingUtilities) { utility in
+                        UpdateRow(title: utility.name, detail: "\(utility.current ?? "unknown") → \(utility.latest ?? "unavailable")",
+                                  note: source(utility), issue: utility.issue, current: false,
+                                  buttonTitle: "Update", action: { update(utility) }, enabled: utility.healthy)
                     }
-                    ForEach(status.utilities) { utility in
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(utility.name).font(.headline)
-                                Text("\(utility.current ?? "unknown") → \(utility.latest ?? "unavailable")")
-                                    .font(.callout).foregroundStyle(.secondary)
-                                Text(utility.external ? "Updates from its configured folder" : "Updates from the release catalog")
-                                    .font(.caption).foregroundStyle(.secondary)
-                                if let issue = utility.issue { Text(issue).font(.caption).foregroundStyle(.orange) }
-                            }
-                            Spacer()
-                            Button("Update") {
-                                Task {
-                                    if utility.external, let installed = model.utilities.first(where: { $0.id == utility.id }) {
-                                        await model.perform("update", utility: installed)
-                                    } else { await model.updateRelease(id: utility.id) }
-                                }
-                            }.disabled(!utility.available || !utility.healthy)
-                        }.padding(14).background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
-                    }
-                } else if model.updateError == nil {
-                    Text("Check for the latest release to update the manager or installed utilities.").foregroundStyle(.secondary)
                 }
-                Toggle("Remove quarantine from verified unsigned app updates", isOn: $model.stripQuarantine)
-                    .font(.callout)
-                Text("Settings, SSH keys, Git configuration, caches and menu visibility are kept. Quit and reopen other running utility apps after updating them.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }.padding(24).disabled(model.busy)
+                if !status.currentUtilities.isEmpty || !status.managerUpdate {
+                    Text("Up to date").font(.title2.bold())
+                    if !status.managerUpdate {
+                        UpdateRow(title: "Mac Utilities", detail: status.current ?? model.currentVersion, current: true,
+                                  buttonTitle: "", action: {})
+                    }
+                    ForEach(status.currentUtilities) { utility in
+                        UpdateRow(title: utility.name, detail: utility.current ?? "unknown",
+                                  note: source(utility), issue: utility.issue, current: true,
+                                  buttonTitle: "", action: {})
+                    }
+                }
+            } else if model.busy {
+                Label("Checking for updates…", systemImage: "arrow.triangle.2.circlepath").foregroundStyle(.secondary)
+            } else if model.updateError == nil {
+                Text("Check for the latest release to update the manager or installed utilities.").foregroundStyle(.secondary)
+            }
+            Toggle("Remove quarantine from verified unsigned app updates", isOn: $model.stripQuarantine)
+                .font(.callout)
+            Text("Settings, SSH keys, Git configuration, caches and menu visibility are kept. Quit and reopen other running utility apps after updating them.")
+                .font(.caption).foregroundStyle(.secondary)
+        }.padding(24).disabled(model.busy)
+    }
+
+    @ViewBuilder private func summary(_ status: ReleaseStatus) -> some View {
+        let count = status.updateCount
+        HStack {
+            if count == 0 {
+                Label("Everything is up to date", systemImage: "checkmark.circle.fill")
+                    .font(.title3.bold()).foregroundStyle(.green)
+            } else {
+                Label("\(count) update\(count == 1 ? "" : "s") available", systemImage: "arrow.down.circle.fill")
+                    .font(.title3.bold()).foregroundStyle(Color.accentColor)
+            }
+            Spacer()
+            if count > 0 {
+                Button("Update \(count) & relaunch") { Task { await model.updateRelease() } }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(status.pendingUtilities.contains { !$0.healthy })
+                    .help("Install every available update")
+            }
         }
+    }
+
+    private func source(_ utility: UtilityUpdate) -> String {
+        utility.external ? "Updates from its configured folder" : "Updates from the release catalog"
+    }
+
+    private func update(_ utility: UtilityUpdate) {
+        Task {
+            if utility.external, let installed = model.utilities.first(where: { $0.id == utility.id }) {
+                await model.perform("update", utility: installed)
+            } else { await model.updateRelease(id: utility.id) }
+        }
+    }
+}
+
+struct UpdatesView: View {
+    @ObservedObject var model: ManagerModel
+    var checksOnAppear = true
+
+    var body: some View {
+        ScrollView { UpdatesContent(model: model) }
+            .task { if checksOnAppear { await model.checkUpdates() } }
     }
 }
 

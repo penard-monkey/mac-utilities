@@ -178,6 +178,27 @@ def backend_path(home):
     raise ReleaseError('Install Mac Utilities before checking installed utility updates')
 
 
+def newer(candidate, installed):
+    """True only when candidate is strictly newer than installed (None = not installed)."""
+    if not installed:
+        return True
+    if not candidate:
+        return False
+    def parts(value): return tuple(int(p) for p in value.lstrip('v').split('.'))
+    return parts(candidate) > parts(installed)
+
+
+def manager_state(home, meta, current=None):
+    """(installed manager version, whether the manager needs updating)."""
+    if not current:
+        info = home/'Applications/Mac Utilities.app/Contents/Info.plist'
+        current = plistlib.loads(info.read_bytes()).get('CFBundleShortVersionString') if info.exists() else None
+    receipt_path = home/'Library/Application Support/mac-utilities/state/manager-app.json'
+    receipt = json.loads(receipt_path.read_text()) if receipt_path.exists() else {}
+    migration = current == meta['version'] and not receipt.get('release')
+    return current, newer(meta['version'], current) or migration
+
+
 def check_updates(args):
     home = Path(args.home).expanduser().resolve()
     with tempfile.TemporaryDirectory(prefix='mac-utilities-check-') as work:
@@ -190,23 +211,13 @@ def check_updates(args):
         sys.path.insert(0, str(backend_path(home)))
         lifecycle = importlib.import_module('lifecycle')
         manager = lifecycle.Manager(work/'catalog/Catalog', home, system_effects=False)
-        current = args.current_version
-        if not current:
-            info = home/'Applications/Mac Utilities.app/Contents/Info.plist'
-            current = plistlib.loads(info.read_bytes()).get('CFBundleShortVersionString') if info.exists() else None
+        current, manager_update = manager_state(home, meta, args.current_version)
         with manager.lock():
             entries = manager.catalog()
-        def newer(candidate, installed):
-            if not installed:
-                return True
-            def parts(value): return tuple(int(p) for p in value.lstrip('v').split('.'))
-            return parts(candidate) > parts(installed)
-        receipt_path = manager.root/'state/manager-app.json'
-        receipt = json.loads(receipt_path.read_text()) if receipt_path.exists() else {}
-        migration = current == meta['version'] and not receipt.get('release')
-        return {'current': current, 'latest': args.tag, 'manager_update': newer(meta['version'], current) or migration,
+        return {'current': current, 'latest': args.tag, 'manager_update': manager_update,
                 'utilities': [{'id': e['id'], 'name': e['name'], 'current': e['version'],
-                               'latest': e['available_version'], 'available': e['available'], 'healthy': e['healthy'],
+                               'latest': e['available_version'], 'available': e['available'],
+                               'update_available': e['update_available'], 'healthy': e['healthy'],
                                'external': e['source'] != str(manager.repo), 'issue': e['issue']}
                               for e in entries if e['installed']]}
 
@@ -281,6 +292,8 @@ def install(args):
         package = importlib.import_module('package_app')
         manager = lifecycle.Manager(catalog, home, system_effects=not args.no_system_effects)
         selected = []
+        # Install always lays down the manager; update touches it only when asked or newer.
+        update_manager = args.action == 'install' or args.id == 'manager'
         if args.action == 'install':
             selected = [v for v in os.environ.get('MAC_UTILITIES_INSTALL', '').split(',') if v]
             if args.id:
@@ -316,7 +329,8 @@ def install(args):
                 return {'message': 'Removed managed files; settings and keys retained.'}
             if args.action == 'update':
                 if args.all:
-                    selected = [entry['id'] for entry in manager.catalog() if entry['installed'] and entry['id'] in available]
+                    update_manager = manager_state(home, meta)[1]
+                    selected = [entry['id'] for entry in manager.catalog() if entry['installed'] and entry['update_available']]
                 elif args.id and args.id != 'manager':
                     if not manager.receipt(args.id):
                         raise ReleaseError('Install the utility before updating it')
@@ -339,7 +353,7 @@ def install(args):
                     shutil.copy2(source, cache/name)
                     copy_quarantine(source, cache/name)
                 shutil.copy2(work/'checksums.txt', cache/'checksums.txt')
-            if args.action == 'install' or args.all or args.id == 'manager':
+            if update_manager:
                 apps.mkdir(parents=True, exist_ok=True)
                 with tempfile.TemporaryDirectory(prefix='.mac-utilities-', dir=str(apps)) as appstage:
                     staged = Path(appstage)/bundle.name
@@ -367,7 +381,7 @@ def install(args):
             lifecycle.atomic_json(root/'state/release.json', {'schema':1, 'repo':args.repo, 'tag':args.tag,
                                 'catalog':str(manager.repo)})
             messages.append('Release '+args.tag+' installed. Restart running apps to use the new version.')
-            return {'message': '\n'.join(messages), 'relaunch':args.action == 'install' or args.all or args.id == 'manager'}
+            return {'message': '\n'.join(messages), 'relaunch':update_manager}
 
 
 def main():

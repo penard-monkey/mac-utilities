@@ -23,6 +23,11 @@ gate = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gate)
 
 
+def bump_version(version):
+    major, minor, patch = version.split('.')
+    return '.'.join([major, minor, str(int(patch)+1)])
+
+
 class ReleaseTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -58,7 +63,7 @@ class ReleaseTests(unittest.TestCase):
         binary.chmod(0o755)
         return app
 
-    def fixture(self, tag):
+    def fixture(self, tag, bump=()):
         stage = self.base/tag
         stage.mkdir()
         meta = {'schema':1, 'repo':'penard-monkey/mac-utilities', 'tag':tag, 'version':tag[1:],
@@ -70,11 +75,19 @@ class ReleaseTests(unittest.TestCase):
         catalog = stage/'Catalog'
         for utility_id in ('tools', 'memory'):
             shutil.copytree(ROOT/'swiftbar'/utility_id, catalog/'swiftbar'/utility_id, ignore=shutil.ignore_patterns('__pycache__', 'tests'))
+        for utility_id in bump:
+            path = catalog/'swiftbar'/utility_id/'mac-utility.json'
+            if path.exists():
+                manifest = json.loads(path.read_text())
+                manifest['version'] = bump_version(manifest['version'])
+                path.write_text(json.dumps(manifest))
         manifests = {}
         for utility_id in meta['utilities']:
             app_source = catalog/utility_id
             (app_source/'scripts').mkdir(parents=True)
             manifest = json.loads((ROOT/utility_id/'mac-utility.json').read_text())
+            if utility_id in bump:
+                manifest['version'] = bump_version(manifest['version'])
             manifest['install'] = {'command':['scripts/release-install.sh', '{applications}']}
             (app_source/'mac-utility.json').write_text(json.dumps(manifest))
             (app_source/'release-app.json').write_text(json.dumps({'schema':1, 'repo':meta['repo'], 'tag':tag, 'asset':meta['utilities'][utility_id], 'app':manifest['app'], 'version':manifest['version']}))
@@ -125,10 +138,12 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(record['release']['tag'], 'v1.0.0')
         backend = ROOT/'utilities-manager/backend/lifecycle.py'
         subprocess.run(['/usr/bin/python3', str(backend), '--repo', str(self.base/'v1.0.0/Catalog'), '--home', str(self.home), '--no-system-effects', 'menu', 'memory', 'hide'], check=True, stdout=subprocess.DEVNULL)
-        self.fixture('v1.0.1')
+        self.fixture('v1.0.1', bump=('git-settings',))
         self.cli('update', '--all')
         self.assertFalse(json.loads((self.support/'state/receipts/memory.json').read_text())['visible'])
         self.assertEqual(json.loads((self.support/'state/receipts/git-settings.json').read_text())['release']['tag'], 'v1.0.1')
+        # memory had no newer version, so --all left its receipt alone.
+        self.assertEqual(json.loads((self.support/'state/receipts/memory.json').read_text())['release']['tag'], 'v1.0.0')
         self.cli('uninstall', 'git-settings')
         self.cli('uninstall', 'manager')
         self.assertFalse((self.home/'Applications/Git & SSH.app').exists())
@@ -288,6 +303,39 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(settings['source'], str(self.support/'releases/v1.0.1/Catalog'))
         self.assertTrue(Path(settings['source']).is_dir())
 
+    def test_check_reports_update_available_only_for_newer_versions(self):
+        self.cli(selected='memory,git-settings,video-preview')
+        def flags():
+            status = self.runtime('--artifacts', str(self.assets), '--check')
+            return {e['id']: e['update_available'] for e in status['utilities']}, status
+        # Equal versions (the release is newer, the utilities are not).
+        self.fixture('v1.0.1')
+        flags_equal, status = flags()
+        self.assertTrue(status['manager_update'])
+        self.assertEqual(set(flags_equal.values()), {False})
+        self.assertIn('git-settings', flags_equal)
+        # Newer: only the bumped utility; "not installed" utilities are not listed at all.
+        self.fixture('v1.0.2', bump=('git-settings',))
+        flags_newer, _ = flags()
+        self.assertEqual({k for k, v in flags_newer.items() if v}, {'git-settings'})
+        # update --all leaves the manager alone when it is current.
+        self.cli('update', '--all')
+        self.assertEqual(json.loads((self.support/'state/receipts/git-settings.json').read_text())['release']['tag'], 'v1.0.2')
+        self.assertEqual(json.loads((self.support/'state/receipts/memory.json').read_text())['release']['tag'], 'v1.0.0')
+        flags_after, status = flags()
+        self.assertEqual(set(flags_after.values()), {False})
+        self.assertFalse(status['manager_update'])
+        # Older catalog than installed: not an update.
+        self.fixture('v1.0.3')
+        for utility_id in ('git-settings',):
+            path = self.base/'v1.0.3/Catalog'/utility_id/'mac-utility.json'
+            manifest = json.loads(path.read_text())
+            manifest['version'] = '0.9.0'
+            path.write_text(json.dumps(manifest))
+        self.zip(self.base/'v1.0.3/Catalog', 'mac-utilities-catalog.zip')
+        self.sums()
+        self.assertFalse(flags()[0]['git-settings'])
+
     def test_external_sources_keep_updating_from_their_folder(self):
         self.cli(selected='')
         external = self.base/'private-source'
@@ -304,6 +352,14 @@ class ReleaseTests(unittest.TestCase):
         subprocess.run(['/usr/bin/python3', str(ROOT/'utilities-manager/backend/lifecycle.py'), '--repo', str(self.base/'v1.0.0/Catalog'),
                         '--home', str(self.home), '--no-system-effects', 'install', 'private-tool'], check=True, stdout=subprocess.DEVNULL)
         plugin.write_text('#!/usr/bin/python3\nprint("second")\n')
+        status = self.runtime('--artifacts', str(self.assets), '--check')
+        self.assertFalse(next(e for e in status['utilities'] if e['id']=='private-tool')['update_available'])
+        self.cli('update', '--all')
+        self.assertIn('first', (self.support/'payloads/private-tool/private.5s.py').read_text())
+        manifest['version'] = '1.0.1'
+        (external/'mac-utility.json').write_text(json.dumps(manifest))
+        status = self.runtime('--artifacts', str(self.assets), '--check')
+        self.assertTrue(next(e for e in status['utilities'] if e['id']=='private-tool')['update_available'])
         self.cli('update', '--all')
         record = json.loads((self.support/'state/receipts/private-tool.json').read_text())
         self.assertEqual(record['source'], str(external))
