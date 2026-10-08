@@ -8,6 +8,7 @@
 # takes ownership of the bundle, so this script only ever produces the app —
 # it touches no user settings, no SwiftBar preference and nothing privileged.
 set -euo pipefail
+SCRIPT_VERSION="v1.0.1"
 if [[ $# -gt 1 ]]; then echo "Usage: $0 [applications-directory]" >&2; exit 2; fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="${1:-$HOME/Applications}"

@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.5.1]
+
+- QR Reader 1.0.1: region scans decode again; the capture was deleted before it
+  was read.
+
 ## [1.5.0]
 
 - New utility, **QR Reader** 1.0.0: drag a box around a QR code on screen and

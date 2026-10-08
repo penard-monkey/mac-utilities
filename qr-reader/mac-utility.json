@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "qr-reader",
   "name": "QR Reader",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Scan a QR code off the screen and approve what it opens before it opens.",
   "presentation": "app",
   "app": {
