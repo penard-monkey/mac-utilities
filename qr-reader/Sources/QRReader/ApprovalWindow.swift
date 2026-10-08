@@ -26,7 +26,7 @@ final class ApprovalWindowController: NSObject, NSWindowDelegate {
         return controller.run()
     }
 
-    private init(verdict: Verdict, settings: Settings) {
+    init(verdict: Verdict, settings: Settings) {
         self.verdict = verdict
         self.settings = settings
         panel = DenyingPanel(contentRect: NSRect(x: 0, y: 0, width: 520, height: 200),
@@ -38,7 +38,28 @@ final class ApprovalWindowController: NSObject, NSWindowDelegate {
         panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false
         panel.contentView = buildContent()
-        panel.setContentSize(panel.contentView!.fittingSize)
+        fitPanel()
+    }
+
+    /// Width of the text column; the window is this plus the side insets.
+    private static let contentWidth: CGFloat = 470
+
+    /// Size the window from the content's real constraints, never from a guess.
+    private func fitPanel() {
+        guard let content = panel.contentView else { return }
+        content.layoutSubtreeIfNeeded()
+        panel.setContentSize(content.fittingSize)
+    }
+
+    /// The content view, exposed so a render harness can draw the real layout.
+    var contentViewForRendering: NSView { panel.contentView! }
+
+    /// Render-harness hooks: put the window in the Details-open or redirect-result state.
+    func showDetailsForRendering() { rebuildDetails(visible: true) }
+    func showRedirectResultForRendering(_ text: String) {
+        redirectLabel?.isHidden = false
+        redirectLabel?.stringValue = text
+        fitPanel()
     }
 
     private func run() -> ApprovalDecision {
@@ -52,7 +73,17 @@ final class ApprovalWindowController: NSObject, NSWindowDelegate {
     // MARK: layout
 
     private func buildContent() -> NSView {
+        let container = NSView()
         let stack = NSStackView()
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: container.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            stack.widthAnchor.constraint(equalToConstant: Self.contentWidth + 40),
+        ])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 12
@@ -91,13 +122,13 @@ final class ApprovalWindowController: NSObject, NSWindowDelegate {
             label.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
             label.textColor = .secondaryLabelColor
             label.isHidden = true
-            label.preferredMaxLayoutWidth = 460
+            label.preferredMaxLayoutWidth = Self.contentWidth
             redirectLabel = label
             stack.addView(label, in: .leading)
         }
 
         stack.addView(buttonRow(), in: .leading)
-        return stack
+        return container
     }
 
     private func headerRow() -> NSView {
@@ -122,21 +153,21 @@ final class ApprovalWindowController: NSObject, NSWindowDelegate {
 
     /// Scrollable and wrapping: the whole payload is visible, including its end.
     private func payloadView() -> NSView {
-        let textView = NSTextView()
+        let scroll = NSTextView.scrollableTextView()
+        let textView = scroll.documentView as! NSTextView
         textView.isEditable = false
         textView.isSelectable = true
         textView.drawsBackground = false
         textView.textContainerInset = NSSize(width: 6, height: 6)
         textView.textStorage?.setAttributedString(attributedPayload())
 
-        let scroll = NSScrollView()
-        scroll.documentView = textView
         scroll.hasVerticalScroller = true
+        scroll.hasHorizontalScroller = false
         scroll.drawsBackground = true
         scroll.backgroundColor = .textBackgroundColor
         scroll.borderType = .bezelBorder
         scroll.translatesAutoresizingMaskIntoConstraints = false
-        scroll.widthAnchor.constraint(equalToConstant: 470).isActive = true
+        scroll.widthAnchor.constraint(equalToConstant: Self.contentWidth).isActive = true
         scroll.heightAnchor.constraint(equalToConstant: verdict.display.count > 120 ? 84 : 52).isActive = true
         return scroll
     }
@@ -193,7 +224,7 @@ final class ApprovalWindowController: NSObject, NSWindowDelegate {
         let label = NSTextField(labelWithAttributedString: text)
         label.lineBreakMode = .byWordWrapping
         label.maximumNumberOfLines = 4
-        label.preferredMaxLayoutWidth = 450
+        label.preferredMaxLayoutWidth = Self.contentWidth - 20
         row.addView(label, in: .leading)
         return row
     }
@@ -224,11 +255,14 @@ final class ApprovalWindowController: NSObject, NSWindowDelegate {
             reveal.bezelStyle = .inline
             row.addView(reveal, in: .leading)
         } else {
-            let value = NSTextField(labelWithString: detail.value)
+            let value = NSTextField(wrappingLabelWithString: detail.value)
             value.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-            value.lineBreakMode = .byTruncatingTail
+            value.lineBreakMode = .byCharWrapping
+            value.maximumNumberOfLines = 0
             value.isSelectable = true
-            value.preferredMaxLayoutWidth = 370
+            value.preferredMaxLayoutWidth = Self.contentWidth - 80
+            value.translatesAutoresizingMaskIntoConstraints = false
+            value.widthAnchor.constraint(lessThanOrEqualToConstant: Self.contentWidth - 80).isActive = true
             row.addView(value, in: .leading)
         }
         return row
@@ -304,7 +338,7 @@ final class ApprovalWindowController: NSObject, NSWindowDelegate {
         details.views.forEach { details.removeView($0) }
         verdict.details.forEach { details.addView(detailRow($0), in: .leading) }
         details.isHidden = !visible
-        panel.setContentSize(panel.contentView!.fittingSize)
+        fitPanel()
     }
 
     private func confirmHandoff() -> Bool {
@@ -359,10 +393,10 @@ final class ApprovalWindowController: NSObject, NSWindowDelegate {
         guard let url = verdict.openURL, let label = redirectLabel else { return }
         label.isHidden = false
         label.stringValue = "Resolving…"
-        panel.setContentSize(panel.contentView!.fittingSize)
+        fitPanel()
         RedirectResolver.resolve(url) { [weak self] result in
             label.stringValue = result
-            self?.panel.setContentSize(self?.panel.contentView?.fittingSize ?? .zero)
+            self?.fitPanel()
         }
     }
 
