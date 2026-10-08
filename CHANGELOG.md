@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.2]
+
+- QR Reader 1.0.2: the approval window shows the link again. The payload box
+  rendered empty and the window was narrower than its contents, clipping the
+  box and the Cancel button. Detail values now wrap instead of truncating.
+
 ## [1.5.1]
 
 - QR Reader 1.0.1: region scans decode again; the capture was deleted before it
