@@ -39,7 +39,10 @@ enum CaptureError: LocalizedError {
 ///
 /// A captured region can contain anything that was on screen, so the temporary
 /// file exists only between `screencapture` writing it and this function
-/// reading it, and is removed on every exit path.
+/// reading it. The file is loaded into memory first, then removed on every exit
+/// path. This ensures image decoding completes before the underlying file is
+/// deleted (ImageIO decodes lazily from a mapped file, so without this the defer
+/// would delete the file before Vision could read the pixels).
 enum CaptureService {
 
     static var hasScreenRecordingPermission: Bool { CGPreflightScreenCaptureAccess() }
@@ -93,8 +96,10 @@ enum CaptureService {
             }
             throw CaptureError.captureFailed(message.trimmingCharacters(in: .whitespacesAndNewlines))
         }
-        guard let source = CGImageSourceCreateWithURL(target as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+        // Load the file into memory first, so the defer can safely delete it.
+        let data = try Data(contentsOf: target)
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else {
             throw CaptureError.captureFailed("the capture could not be read back")
         }
         return image
@@ -123,7 +128,7 @@ enum CaptureService {
 
     private static func fileImage(_ url: URL) throws -> CGImage {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else {
             throw CaptureError.notAnImage(url)
         }
         return image
