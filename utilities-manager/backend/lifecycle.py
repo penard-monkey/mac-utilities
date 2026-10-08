@@ -296,6 +296,14 @@ class Manager:
         return {action: "sudo " + shlex.join([str(Path(record["payload"]) / hook["command"][0])] + hook["command"][1:])
                 for action in ("install", "uninstall") for hook in [record["manifest"].get(action)] if hook}
 
+    @staticmethod
+    def version_newer(candidate, installed):
+        def parts(value): return tuple(int(p) for p in value.lstrip("v").split("."))
+        try:
+            return bool(candidate and installed and parts(candidate) > parts(installed))
+        except ValueError:
+            return False
+
     def catalog(self):
         available = self.manifests()
         entries = []
@@ -320,6 +328,8 @@ class Manager:
                 "healthy": healthy, "issue": issue,
                 "version": record["version"] if record else None,
                 "available_version": available[utility_id][0]["version"] if utility_id in available else None,
+                "update_available": bool(record) and utility_id in available and
+                                    self.version_newer(available[utility_id][0]["version"], record["version"]),
                 "presentation": manifest["presentation"] if manifest else "app",
                 "visible": record.get("visible", False) if record else False,
                 "app": record.get("app") if record else None,

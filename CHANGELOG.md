@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.5.3]
+
+- Mac Utilities 1.1.0: the Updates tab lists only real updates; up-to-date
+  utilities show no Update button, and Update all touches only what changed.
+
 ## [1.5.2]
 
 - QR Reader 1.0.2: the approval window shows the link again. The payload box
