@@ -76,3 +76,12 @@ not a formality.
 - **Noisy GIFs fall to quality 1.** The fallback lowers quality before frame
   rate; on busy GIFs dropping frames first may look better. Worth comparing
   on real inputs. ([session](docs/sessions/2026-10-03-gif-stickers/summary.md))
+
+## Repository conventions
+
+- **One planning location.** The worktrees block in `AGENTS.md` and the
+  SessionStart hook put plans in `.planning/<place>/`. The "Planning docs"
+  section and `.claude/close-out.md` say the worktree root. Pick one and
+  update the loser (worktrees owns the block, so a change there goes through
+  `worktrees rules apply`).
+  ([session](docs/sessions/2026-10-15-agent-instructions/summary.md))
